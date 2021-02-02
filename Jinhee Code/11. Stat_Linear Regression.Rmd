@@ -1,0 +1,119 @@
+---
+title: "Linear Regression"
+author: "Jinhee Chang"
+date: "11/30/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 
+
+```{r}
+source("Automated_functioncode.R")
+
+base_diseasecode <- c("G30", "E11", "E14", "I21", "I22", "I50", "I64", "J44")
+
+result = list()
+for (i in (1:length(base_diseasecode))) {
+  
+  df_raw <- normalized(base_diseasecode[i])
+  df <- subset(df_raw[[1]], category %like% df_raw[[2]])
+  
+  mylm = lm(`Incidence Rate` ~ `Age at Diagnosis`, data = df)
+  lmsum = summary(mylm)
+
+  result[[base_diseasecode[i]]] = c(lmsum$coefficients[2,1], lmsum$coefficients[2,4])
+}
+
+for (i in (1:length(geneatlas_ICD10))) {
+
+  df_raw <- normalized(geneatlas_ICD10[i])
+  
+  if (is.null(df_raw)) {
+    next
+  }
+  df <- subset(df_raw[[1]], category %like% df_raw[[2]])
+  
+  mylm = lm(`Incidence Rate` ~ `Age at Diagnosis`, data = df)
+  lmsum = summary(mylm)
+
+  result[[geneatlas_ICD10[i]]] = c(lmsum$coefficients[2,1], lmsum$coefficients[2,4])
+}
+
+result <- as.data.frame(result)
+result <- t(result)
+result <- as.data.frame(result)
+result$ICD10code <- rownames(result)
+
+colnames(result) <- c("Estimate", "pvalue", "ICD10code")
+rownames(result) <- NULL
+
+result <- result %>% select(3,1,2)
+
+result <- merge(x = result, y = ICD10_Code[,1:2], by.x = "ICD10code", by.y = "coding")
+result <- result[order(result$Estimate, decreasing = TRUE),]
+result <- result[order(result$ICD10code, decreasing = FALSE),]
+
+write.table(result, file = "Linear Regression from Normalized Incidence Rate.txt",
+            row.names = FALSE, quote = FALSE, sep = "\t")
+
+library(xlsx)
+write.xlsx(result, "Linear Regression from Normalized Incidence Rate.xlsx", 
+           sheetName = "Sheet1",
+           col.names = TRUE, row.names = TRUE, append = FALSE)
+```
+
+```{r}
+source("Automated_functioncode.R")
+
+normalized("G30")
+G30_df_raw <- normalized("G30")[[1]]
+G30_df <- subset(G30_df_raw, category %like% "G30")
+
+a <- normalized("G30")
+b <- subset(a[[1]], category %like% a[[2]])
+
+G30lm = lm(`Incidence Rate` ~ `Age at Diagnosis`, data = G30_df)
+G30lmsum = summary(G30lm)
+
+G30lmsum
+
+c(G30lmsum$coefficients[2,1], G30lmsum$coefficients[2,4])
+```
+
+```{r}
+source("Automated_functioncode.R")
+D48_df_raw <- normalized("D48")[[1]]
+D48_df <- subset(D48_df_raw, category %like% "D48")
+
+D48lm = lm(`Incidence Rate` ~ `Age at Diagnosis`, data = D48_df)
+D48lmsum = summary(D48lm)
+
+D48lmsum
+```
+
+```{r}
+master_5 <- readRDS("master_5.rds")
+master_5
+```
+```{r}
+library(tidyr)
+library(dplyr)
+
+sexdata <- read.csv("31.csv")
+
+colnames(sexdata) <- c("eid", "gender")
+sexdata
+
+master_5new <- merge(x = master_5, y = sexdata, by = "eid", all = TRUE)
+master_5new
+
+master_5new <- master_5new %>% select(-(9:12))
+master_5new$gender <- replace(master_5new$gender, master_5new$gender == 0, "Female")
+master_5new$gender <- replace(master_5new$gender, master_5new$gender == 1, "Male")
+saveRDS(master_5new, file = "master_6.rds")
+```
+

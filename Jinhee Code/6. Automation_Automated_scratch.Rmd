@@ -1,0 +1,181 @@
+---
+title: "Automated incidence rate of diagnosis data"
+author: "Jinhee Chang"
+date: "9/28/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Goal of this code: Automate the incidence rate of diagnosis data
+
+#master5 data includes patient ID, Disease code, whether this is ICD9/ICD10 based, the date patient got diagnosed, whether the diagnosis was main or secondary, patient's birthday, Age patient got diagnosed, meaning of the diagnosis, etc - Total: 264,069 patients, 3,003,823 diagnosis data
+
+#All data was retrieved from UK biobank (https://www.ukbiobank.ac.uk/) and was downloaded using Stampede2. I created a custom file (master5) by merging multiple datasets for my convenience in the past.
+
+```{r}
+# Load the data that I am going to use
+master6 <- readRDS("master_6.rds")
+
+# Check how this data looks like
+head(master6)
+
+# Load ICD10_Code data
+ICD10_Code <- readr::read_tsv('coding19.tsv')
+ICD9_Code <- readr::read_tsv('coding87.tsv')
+```
+
+```{r}
+## Don't forget to download this function
+library(tidyr)
+library(dplyr)
+library(data.table)
+
+sum(is.na(master6$Diagnosed_age)) #1230776 NA exist
+# Delete all the rows that have NA on Diagnosed age column
+master6 <- master6[complete.cases(master6), ] #3003823 rows left
+
+# How many patient records are unique
+length(unique(master6$eid)) #264069 patients total
+```
+## Check the age distribution of the total unique patients in master5 file
+
+```{r}
+#hist(unique_master5$Diagnosed_age, breaks = 50)
+hist(master6$Diagnosed_age, breaks = 50)
+
+# Check the minimum age and maximum age of the unique_master5
+min(master6$Diagnosed_age) # 27.93699
+max(master6$Diagnosed_age) # 80.87397
+```
+
+##Make incidence rate using Total Disease age distribution
+```{r}
+# Total Disease incidence rate: totalage_freq
+totalage_freq <- as.data.frame(table(floor(master6$Diagnosed_age)))
+colnames(totalage_freq) <- c("Age at Diagnosis", "Frequency")
+totalage_freq$`Incidence Rate` <-
+  totalage_freq$Frequency/sum(totalage_freq$Frequency)
+totalage_freq$category <- rep(paste0("Total Disease", "(n=",
+                                     sum(totalage_freq$Frequency), ")"),
+                              nrow(totalage_freq))
+totalage_freq$`Age at Diagnosis` <- as.numeric(as.character(totalage_freq$`Age at Diagnosis`))
+
+# Check how this looks like
+totalage_freq
+
+#saveRDS(totalage_freq, file = "totalage_freq.rds")
+```
+## G30 Alzheimer's disease (AD) - No AD in ICD9 ("3310")
+G30.0 Alzheimer's disease with early onset    95
+G30.1 Alzheimer's disease with late onset     41
+G30.8 Other Alzheimer's disease               90
+G30.9 Alzheimer's disease, unspecified        815
+
+## I50 Heart failure (CHF) - 17 more in ICD9 ("428")
+
+#master5 %>% filter(str_detect(Disease_Code, "^428"))
+
+I50.0 Congestive heart failure          3607
+I50.1 Left ventricular failure          5398
+I50.9 Heart failure, unspecified        2532
+
+## J44 Other chronic obstructive pulmonary disease (COPD) - 7 more in ICD9 ("491")
+
+#master5 %>% filter(str_detect(Disease_Code, "^491"))
+
+J44.0 Chronic obstructive pulmonary disease with acute lower respiratory infection       3703
+J44.1 Chronic obstructive pulmonary disease with acute exacerbation, unspecified         1707
+J44.8 Other specified chronic obstructive pulmonary disease                              1042
+J44.9 Chronic obstructive pulmonary disease, unspecified                                11734
+
+## I21 Acute myocardial infarction (Acute MI) - 168 more in ICD9 ("410")
+
+#master5 %>% filter(str_detect(Disease_Code, "^410"))
+
+I21.0 Acute transmural myocardial infarction of anterior wall       2283
+I21.1 Acute transmural myocardial infarction of inferior wall       2785
+I21.2 Acute transmural myocardial infarction of other sites         341
+I21.3 Acute transmural myocardial infarction of unspecified site    171
+I21.4 Acute subendocardial myocardial infarction                    2168
+I21.9 Acute myocardial infarction, unspecified                      4789
+
+## I22 Subsequent myocardial infarction (Subsequent MI)
+I22.0 Subsequent myocardial infarction of anterior wall             117
+I22.1 Subsequent myocardial infarction of inferior wall             205
+I22.8 Subsequent myocardial infarction of other sites               90
+I22.9 Subsequent myocardial infarction of unspecified site          545
+
+## I64 Stroke, not specified as haemorrhage or infarction  1432 - 11 more in ICD9 ("434")
+
+#master5 %>% filter(str_detect(Disease_Code, "^434"))
+
+## E11 Non-insulin-dependent diabetes mellitus (Diabetes Type II) - 104 more in ICD9 ("2500")
+
+#master5 %>% filter(str_detect(Disease_Code, "^2500"))
+
+E11.0 With coma                                       105
+E11.1 With ketoacidosis                               220
+E11.2 With renal complications                        394
+E11.3 With ophthalmic complications                   1861
+E11.4 With neurological complications                 815
+E11.5 With peripheral circulatory complications       506
+E11.6 With other specified complications              153
+E11.7 With multiple complications                     10
+E11.8 With unspecified complications                  86
+E11.9 Without complications                           28852
+
+## E14 Unspecified diabetes mellitus (Unspecified Diabetes) - 5 more in ICD9 ("2509")
+
+#master5 %>% filter(str_detect(Disease_Code, "^2509"))
+
+E14.0 With coma                                       14
+E14.1 With ketoacidosis                               34
+E14.2 Withrenal complications                         31
+E14.3 With ophthalmic complications                   389
+E14.4 With neurological complications                 49
+E14.5 With peripheral circulatory complications       27
+E14.6 With other specified complications              25
+E14.7 With multiple complications                     3
+E14.8 With unspecified complications                  35
+E14.9 Without complications                           3421
+
+## Total base disease code
+```{r}
+source("Automated_functioncode.R")
+
+base_diseasecode <- c("G30", "E11", "E14", "I21", "I22", "I50", "I64", "J44")
+
+for (i in (1:length(base_diseasecode))) {
+  dataplotting(original_ICD9(base_diseasecode[i]), 2)
+  dataplotting(original(base_diseasecode[i]), 2)
+  dataplotting(normalized(base_diseasecode[i]), NULL)
+}
+```
+
+## From Geneatlas
+
+```{r}
+geneatlas <- read.table("geneatlas.txt", header = TRUE)
+nrow(geneatlas) # 157
+length(which(duplicated(geneatlas$ICD10))) # 46
+geneatlas <- geneatlas[!duplicated(geneatlas$ICD10), ]
+
+duplicated_code <- c("G30", "E11", "E14", "I21", "I22", "I50", "I64", "J44")
+
+sum(geneatlas$ICD10 %in% duplicated_code) #7
+
+geneatlas_ICD10 <- geneatlas$ICD10[! geneatlas$ICD10 %in% duplicated_code]
+geneatlas_ICD10 <- geneatlas_ICD10[!is.na(geneatlas_ICD10)] # total 103
+```
+
+```{r}
+for (i in (1:length(geneatlas_ICD10))) {
+  dataplotting(original_ICD9(geneatlas_ICD10[i]), 2)
+  dataplotting(original(geneatlas_ICD10[i]), 2)
+  dataplotting(normalized(geneatlas_ICD10[i]), NULL)
+}
+```
+

@@ -1,0 +1,161 @@
+---
+title: "Automated_selfreportnoncancer"
+author: "Jinhee Chang"
+date: "10/26/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Self Reported Non Cancer automated
+
+```{r}
+# Load the data that I am going to use
+selfreport_NC <- readRDS("SelfreportedNoncancer.rds")
+
+# Check how this data looks like
+head(selfreport_NC)
+
+# Load Noncancercode and Cancercode data
+Noncancercode <- readr::read_tsv("coding6.tsv")
+Cancercode <- readr::read_tsv("coding3.tsv")
+```
+
+```{r}
+## Don't forget to download this function
+library(tidyr)
+library(dplyr)
+library(data.table)
+
+sum(is.na(selfreport_NC$Noncancerage)) #None
+
+# How many patient records are unique
+length(unique(selfreport_NC$eid)) #379983 patients total
+unique_selfreport_NC <- selfreport_NC[which(!duplicated(selfreport_NC$eid)), ]
+
+# Check how this data looks like
+head(unique_selfreport_NC)
+```
+## Check the age distribution of the total unique patients in selfreport_NC file
+
+```{r}
+hist(selfreport_NC$Noncancerage, breaks = 50)
+
+
+# Check the minimum age and maximum age of the selfreport_NC
+min(selfreport_NC$Noncancerage) # 0
+max(selfreport_NC$Noncancerage) # 81
+```
+
+```{r}
+# Don't forget to download this function
+library(tidyr)
+library(dplyr)
+library(data.table)
+library(ggplot2)
+
+# code_num: Disease code from ICD10
+test_selfreportNC <- function(code_num, freq = 100, age_min = 27, age_max = 65) {
+  
+  result <- selfreport_NC[grep(code_num, selfreport_NC$Noncancercode), ]
+  
+  if (nrow(result) < freq) {
+    return(NULL)
+  }
+  
+  age_freq <- as.data.frame(table(floor(result$Noncancerage)))
+  colnames(age_freq) <- c("Age at Diagnosis", "Frequency")
+  age_freq$`Incidence Rate` <- age_freq$Frequency/sum(age_freq$Frequency)
+  age_freq$category <- rep(paste0(result$meaning[1], "(n=", nrow(result), ")"),
+                           nrow(age_freq))
+
+  age_freq$`Age at Diagnosis` <- as.numeric(as.character(age_freq$`Age at Diagnosis`))
+  age_freq$category <- as.factor(age_freq$category)
+  
+  # Draw line plot
+  plotdata<- ggplot(data = age_freq, aes(x = `Age at Diagnosis`,
+                                  y = log10(`Incidence Rate`), color = category), 
+                    las = 3)+
+  #geom_line()+
+  geom_smooth(alpha = .15, aes(fill = category))+
+  scale_x_continuous(limits = c(age_min, age_max), n.breaks = 10)+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+  labs(y = "log10(Incidence Rate)", x = "Age at Diagnosis")+
+  theme_bw()+
+  theme(legend.position = "right", 
+        legend.direction = "vertical",
+        legend.background = element_rect(color = "steelblue", linetype = "solid"),
+        legend.text = element_text(size = 8))
+  
+    
+  #print(plotdata)
+  
+  png(paste0(code_num, "_plot.png"), res = 80, width = 1000, height = 600)
+  print(plotdata)
+  dev.off() 
+  
+  return(age_freq)
+
+}
+```
+
+## 1263 dementia/alzheimers/cognitive impairment (AD) - Total: 143
+
+```{r}
+# AD
+test_selfreportNC("1263")
+```
+
+## 1076 heart failure/pulmonary odema (CHF) - Total: 358
+
+```{r}
+# CHF
+test_selfreportNC("1076")
+```
+
+## 1112 chronic obstructive airways disease/copd - Total: 1982
+
+```{r}
+# COPD
+test_selfreportNC("1112")
+```
+## 1075 heart attack/myocardial infarction - Total: 12142
+
+```{r}
+# Acute MI 
+test_selfreportNC("1075")
+```
+## 1081 stroke - Total: 7021
+
+```{r}
+# Stroke
+test_selfreportNC("1081")
+```
+## 1583 ischaemic stroke - Total: 32
+
+```{r}
+# Ischaemic Stroke
+test_selfreportNC("1583")
+```
+
+## 1223 type 2 diabetes - Total: 4328
+
+```{r}
+# Diabetes Type II
+test_selfreportNC("1223")
+```
+
+## 1220 diabetes - Total: 23000
+
+```{r}
+# Unspecified Diabetes 
+test_selfreportNC("1220")
+```
+## negative control: 1567 infectious mononucleosis / glandular fever / epstein barr virus (ebv)
+
+```{r}
+test_selfreportNC("1567")
+```
+

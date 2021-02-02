@@ -1,0 +1,299 @@
+---
+title: "Incidence for Alzheimer disease"
+author: "Jinhee Chang"
+date: "9/14/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##Total Alzheimer diseases in Field #41270
+G30 Alzheimer's disease-                      1041
+G30.0 Alzheimer's disease with early onset    95
+G30.1 Alzheimer's disease with late onset     41
+G30.8 Other Alzheimer's disease               90
+G30.9 Alzheimer's disease, unspecified        815
+
+```{r}
+# Load the data that I am going to use
+master5 <- readRDS("master_5.rds")
+
+# Check how this data looks like
+head(master5)
+```
+## Create Alzheimer_diseases that include patient ID, diagnosed age, disease code
+
+#Don't forget to load the functions
+library(tidyr)
+library(dplyr)
+library(data.table)
+
+```{r}
+# Only select patient that has Alzheimer Disease 
+Alzheimer_diseases <- master5[grep("G30", master5$Disease_Code), ]
+# Select patient ID, Diagnosed age, Disease code, content and ICD9.ICD10
+Alzheimer_diseases <- Alzheimer_diseases %>% select(1,7,2,3,5)
+# Check if all ICD9.ICD10 is ICD10
+all(Alzheimer_diseases$ICD9.ICD10 == "ICD10") # True
+# Erase the column
+Alzheimer_diseases <- Alzheimer_diseases %>% select(1,2,3,5)
+# Check how the data looks like
+head(Alzheimer_diseases)
+
+# Erase all the NAs in the Diagnosed_age (missing data)
+length(which(is.na(Alzheimer_diseases$Diagnosed_age))) # 41 total
+Alzheimer_diseases <- Alzheimer_diseases[complete.cases(Alzheimer_diseases), ]
+
+```
+## Make subset of Alzheimer_diseases
+G30.0 Alzheimer's disease with early onset    95
+G30.1 Alzheimer's disease with late onset     41
+G30.8 Other Alzheimer's disease               90
+G30.9 Alzheimer's disease, unspecified        815
+
+```{r}
+# Make subset of Alzheimer_diseases of each Alzheimer disease
+G300 <- subset(Alzheimer_diseases, Disease_Code == 'G300') # 82 total
+G301 <- subset(Alzheimer_diseases, Disease_Code == 'G301') # 41 total
+G308 <- subset(Alzheimer_diseases, Disease_Code == 'G308') # 89 total
+G309 <- subset(Alzheimer_diseases, Disease_Code == 'G309') # 788 total
+
+```
+
+## Check the age range of the Alzheimer_diseases patient
+
+```{r}
+# Check the age distribution of Alzheimer disease patients
+hist(Alzheimer_diseases$Diagnosed_age, breaks = 50)
+
+# Check the minimum age and maximum age of the data
+min(Alzheimer_diseases$Diagnosed_age) # 54.8274
+max(Alzheimer_diseases$Diagnosed_age) # 79.28219
+
+```
+
+## Calculate age frequency and incidence rate by age range
+library(plyr)
+
+```{r}
+# make age range data frame
+my.summary <- data.frame(age.lo = c(50:79), 
+                         age.hi = c(51:80))
+
+# Get age range frequency data
+age_freq <- adply(my.summary, 1, transform, freq = 
+                    sum(Alzheimer_diseases$Diagnosed_age > age.lo
+                    & Alzheimer_diseases$Diagnosed_age <= age.hi))
+
+# Make a new column name age_range and add age.lo and age.hi into one column
+age_freq$age_range <- paste0(age_freq$age.lo, " - ", age_freq$age.hi)
+# Leave only age_range and frequency column
+age_freq <- age_freq %>% select(4,3)
+
+# Add incidence rate to the data
+age_freq$incidence_rate <- age_freq$freq/sum(age_freq$freq)
+
+# Rename the dataframe
+total_Alzheimerdisease_freq <- age_freq
+rm(age_freq)
+
+# Check how this data looks like
+total_Alzheimerdisease_freq
+```
+
+## Repeat the same thing for the 4 subsets
+
+```{r}
+
+# Check the minimum age and maximum age of the subsets
+min(G300$Diagnosed_age) # 57.39726
+max(G300$Diagnosed_age) # 76.59726
+
+min(G301$Diagnosed_age) # 62.98082
+max(G301$Diagnosed_age) # 77.09863
+
+min(G308$Diagnosed_age) # 62.15616
+max(G308$Diagnosed_age) # 78.48219
+
+min(G309$Diagnosed_age) # 54.8274
+max(G309$Diagnosed_age) # 79.28219
+
+```
+
+## Calculate age frequency and incidence rate by age range - G300
+
+```{r}
+# Get age range frequency data
+G300_freq <- adply(my.summary, 1, transform, freq = 
+                    sum(G300$Diagnosed_age > age.lo
+                    & G300$Diagnosed_age <= age.hi))
+
+# Make a new column name age_range and add age.lo and age.hi into one column
+G300_freq$age_range <- paste0(G300_freq$age.lo, " - ", G300_freq$age.hi)
+# Leave only age_range and frequency column
+G300_freq <- G300_freq %>% select(4,3)
+
+# Add incidence rate to the data
+G300_freq$incidence_rate <- G300_freq$freq/sum(G300_freq$freq)
+
+# Check how this data looks like
+G300_freq
+```
+
+
+## Calculate age frequency and incidence rate by age range - G301
+
+```{r}
+# Get age range frequency data
+G301_freq <- adply(my.summary, 1, transform, freq = 
+                    sum(G301$Diagnosed_age > age.lo
+                    & G301$Diagnosed_age <= age.hi))
+
+# Make a new column name age_range and add age.lo and age.hi into one column
+G301_freq$age_range <- paste0(G301_freq$age.lo, " - ", G301_freq$age.hi)
+# Leave only age_range and frequency column
+G301_freq <- G301_freq %>% select(4,3)
+
+# Add incidence rate to the data
+G301_freq$incidence_rate <- G301_freq$freq/sum(G301_freq$freq)
+
+# Check how this data looks like
+G301_freq
+```
+
+## Calculate age frequency and incidence rate by age range - G308
+
+```{r}
+# Get age range frequency data
+G308_freq <- adply(my.summary, 1, transform, freq = 
+                    sum(G308$Diagnosed_age > age.lo
+                    & G308$Diagnosed_age <= age.hi))
+
+# Make a new column name age_range and add age.lo and age.hi into one column
+G308_freq$age_range <- paste0(G308_freq$age.lo, " - ", G308_freq$age.hi)
+# Leave only age_range and frequency column
+G308_freq <- G308_freq %>% select(4,3)
+
+# Add incidence rate to the data
+G308_freq$incidence_rate <- G308_freq$freq/sum(G308_freq$freq)
+
+# Check how this data looks like
+G308_freq
+```
+
+## Calculate age frequency and incidence rate by age range - G309
+
+```{r}
+# Get age range frequency data
+G309_freq <- adply(my.summary, 1, transform, freq = 
+                    sum(G309$Diagnosed_age > age.lo
+                    & G309$Diagnosed_age <= age.hi))
+
+# Make a new column name age_range and add age.lo and age.hi into one column
+G309_freq$age_range <- paste0(G309_freq$age.lo, " - ", G309_freq$age.hi)
+# Leave only age_range and frequency column
+G309_freq <- G309_freq %>% select(4,3)
+
+# Add incidence rate to the data
+G309_freq$incidence_rate <- G309_freq$freq/sum(G309_freq$freq)
+
+# Check how this data looks like
+G309_freq
+```
+## Create total data that includes every dataframe - make automated system
+G30 Alzheimer's disease-                      1041
+G30.0 Alzheimer's disease with early onset    95
+G30.1 Alzheimer's disease with late onset     41
+G30.8 Other Alzheimer's disease               90
+G30.9 Alzheimer's disease, unspecified        815
+
+```{r}
+
+# make a new column name category to group each data
+total_Alzheimerdisease_freq$category <- rep("G30: Alzheimer's disease (n=1000)", nrow(total_Alzheimerdisease_freq))
+G300_freq$category <- rep("G30.0: Alzheimer's disease with early onset (n=82)", nrow(G300_freq))
+G301_freq$category <- rep("G30.1: Alzheimer's disease with late onset (n=41)", nrow(G301_freq))
+G308_freq$category <- rep("G30.8: Other Alzheimer's disease (n=89)", nrow(G308_freq))
+G309_freq$category <- rep("G30.9: Alzheimer's disease, unspecified (n=788)", nrow(G309_freq))
+
+# rowbind each data to make totaldataframe
+totaldataframe <- rbind(total_Alzheimerdisease_freq, G300_freq, G301_freq, G308_freq, G309_freq)
+
+```
+
+
+## Create Plot of total_Alzheimerdisease_freq
+library(ggplot2)
+
+```{r}
+
+# line plot of total_Alzheimerdisease_freq
+ggplot(data = total_Alzheimerdisease_freq, aes(x = as.factor(age_range), y = log10(incidence_rate), group = 1))+
+  geom_line()+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+  labs(title= "Total Alzheimer Disease Frequency",
+                      y="log10(Incidence Rate)", x = "Age Range")
+
+```
+
+## Create Plot for all subsets including total Alzhimer diseases
+
+```{r}
+
+# line plot of all subsets including total Alzhimer diseases
+ggplot(data = totaldataframe, aes(x = as.factor(age_range), y = log10(incidence_rate), color = category, group = category, las = 3))+
+  geom_line()+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+  labs(title= "Alzheimer Disease Frequency",
+                      y="log10(Incidence Rate)", x = "Age Range")
+
+```
+
+```{r}
+#ICD10_coding <- read.table(file = 'coding19.tsv', sep = '\t', header = TRUE)
+result <- master5[grep("G30", master5$Disease_Code), ]
+result
+
+subset_name <- result %>% distinct(Disease_Code)
+subset_list <- list()
+for (i in 1:nrow(subset_name)) {
+  result_subset <- master5[grep(subset_name[i,], master5$Disease_Code), ]
+  age_freq <- as.data.frame(table(floor(result_subset$Diagnosed_age)))
+  colnames(age_freq) <- c("Age at Diagnosis", "Frequency")
+  
+  if (sum(age_freq$"Frequency") > 300) {
+    age_freq$`Incidence Rate` <- age_freq$Frequency/sum(age_freq$Frequency)
+    age_freq$category <- rep(paste0(result_subset$meaning[1], "(n=",
+                                  nrow(result_subset), ")"), nrow(age_freq))
+    subset_list[[i]] <- age_freq
+    }
+}
+
+totaldataframe <- rbindlist(subset_list)
+
+age_freq <- as.data.frame(table(floor(result$Diagnosed_age)))
+colnames(age_freq) <- c("Age at Diagnosis", "Frequency")
+age_freq$`Incidence Rate` <- age_freq$Frequency/sum(age_freq$Frequency)
+age_freq$category <- rep(paste0("Total Disease", "(n=", nrow(result), ")"), nrow(age_freq))
+
+totaldataframe <- rbind(totaldataframe, age_freq)
+totaldataframe$`Age at Diagnosis` <- as.numeric(as.character(totaldataframe$`Age at Diagnosis`))
+totaldataframe$category <- as.factor(totaldataframe$category)
+
+testplot <- ggplot(data = totaldataframe, aes(x = `Age at Diagnosis`,
+                                  y = log10(`Incidence Rate`), color = category, group = category), las = 3)+
+  geom_line()+
+  scale_x_continuous(limits = c(27, 81), n.breaks = 10)+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+  labs(y = "log10(Incidence Rate)", x = "Age at Diagnosis")+
+  theme_bw()
+
+png(paste0("testplot.png"), res = 80, width = 1000, height = 600)
+print(testplot)
+dev.off()
+
+testplot+
+  scale_x_continuous(limits = c(61, 76), n.breaks = 10)
+```

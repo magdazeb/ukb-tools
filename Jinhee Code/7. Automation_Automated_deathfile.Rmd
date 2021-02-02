@@ -1,0 +1,200 @@
+---
+title: "Automated_deathfile"
+author: "Jinhee Chang"
+date: "10/8/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Ultimate Goal: Create death incidence rate and frequency
+library(dplyr)
+library(readr)
+
+```{r}
+# Load the data that I am going to use
+deathfile <- readRDS("Deathfile.rds")
+
+ICD10_Code <- readr::read_tsv('coding19.tsv')
+#unique_diseasecode <- master5[which(!duplicated(master5$Disease_Code)), ]
+#unique_diseasecode %>% mutate(across(where(is.factor), as.character)) -> unique_diseasecode
+
+for (i in 1:nrow(deathfile)) {
+  if (deathfile$Diseasecode[i] %in% ICD10_Code$coding) {
+    deathfile$Descriptioncauseofdeath[i] <- ICD10_Code$meaning[ICD10_Code$coding == deathfile$Diseasecode[i]]
+  } else {
+    deathfile$Descriptioncauseofdeath[i] <- "Unspecified Death"
+  }
+}
+
+saveRDS(deathfile, file = "Deathfile.RDS")
+
+# Check how this data looks like
+head(deathfile)
+```
+
+## Calculate death incidence rate as a whole
+library(tidyr)
+library(dplyr)
+library(data.table)
+
+```{r}
+# Check if there is any NA in ageatdeath
+which(is.na(deathfile$Ageatdeath)) # none
+
+# How many death record are unique
+length(unique(deathfile$eid)) #20465
+unique_death <- deathfile[which(!duplicated(deathfile$eid)), ]
+checkdeath <- table(unique(unique_death$eid) %in% unique(unique_primarydeath$eid)) # 33 NA Diseasecode
+unique_death
+
+# Unique primary death record
+unique_primarydeath <- subset(deathfile, Causeofdeath == "Primary")
+unique_primarydeath # 20473 rows
+
+# Duplicate primary death
+length(which(duplicated(unique_primarydeath$eid))) # 41
+length(unique(unique_primarydeath$eid)) #20432
+```
+
+## Check the age range of the unique patients in "deathrate" (using unique_death)
+
+```{r}
+# Check the age distribution of unique_death patients
+hist(unique_death$Ageatdeath, breaks = 50)
+
+# Check the minimum age and maximum age of the data
+min(unique_death$Ageatdeath) # 40
+max(unique_death$Ageatdeath) # 81
+```
+
+## Draw line graph of unqiue death patients
+library(ggplot2)
+
+```{r}
+deathage_freq <- as.data.frame(table(unique_death$Ageatdeath))
+colnames(deathage_freq) <- c("Age at Death", "Frequency")
+deathage_freq$`Death Rate` <- deathage_freq$Frequency/sum(deathage_freq$Frequency)
+deathage_freq$`Age at Death` <- as.numeric(as.character(deathage_freq$`Age at Death`))
+# which frequency of deathage is over 500
+deathage_freq[which(deathage_freq$Frequency > 500),] # min 61, max 76
+
+ggplot(data = deathage_freq, aes(x = `Age at Death`,
+                                  y = log10(`Death Rate`)), las = 3)+
+  geom_line()+
+  scale_x_continuous(limits = c(61, 76), n.breaks = 10)+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+  labs(title= "Death Frequency (only over 500)", y="log10(Death Rate)", x = "Age Range")+
+  theme_bw()
+```
+
+```{r}
+test_death <- function(code_num, freq = 100, age_min = 40, age_max = 70) {
+  
+  result <- deathfile[grep(code_num, deathfile$Diseasecode), ]
+  subset_name <- result %>% distinct(Diseasecode)
+  
+  subset_list <- list()
+  for (i in 1:nrow(subset_name)) {
+    result_subset <- deathfile[grep(subset_name[i,], deathfile$Diseasecode), ]
+    age_freq <- as.data.frame(table(result_subset$Ageatdeath))
+    colnames(age_freq) <- c("Age at Death", "Frequency")
+    
+    if (sum(age_freq$"Frequency") > freq) {
+      age_freq$`Death Rate` <- age_freq$Frequency/sum(age_freq$Frequency)
+      age_freq$category <- rep(paste0(result_subset$Descriptioncauseofdeath[1],
+                                    "(n=", nrow(result_subset), ")"),
+                               nrow(age_freq))
+      subset_list[[i]] <- age_freq
+      }
+  }
+  
+  totaldataframe <- rbindlist(subset_list)
+  
+  age_freq <- as.data.frame(table(result$Ageatdeath))
+  colnames(age_freq) <- c("Age at Death", "Frequency")
+  age_freq$`Death Rate` <- age_freq$Frequency/sum(age_freq$Frequency)
+  age_freq$category <- rep(paste0("Total Death", "(n=", nrow(result), ")"),
+                           nrow(age_freq))
+
+  totaldataframe <- rbind(totaldataframe, age_freq)
+  totaldataframe$`Age at Death` <- as.numeric(as.character(totaldataframe$`Age at Death`))
+  totaldataframe$category <- as.factor(totaldataframe$category)
+  
+  # Draw line plot
+  plotdata<- ggplot(data = totaldataframe, aes(x = `Age at Death`,
+                                  y = log10(`Death Rate`), color = category,
+                                  group = category), las = 3)+
+  geom_line()+
+  scale_x_continuous(limits = c(age_min, age_max), n.breaks = 10)+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+  labs(y = "log10(Death Rate)", x = "Age at Death")+
+  theme_bw()+
+  theme(legend.position = "right", 
+        legend.direction = "vertical",
+        legend.background = element_rect(color = "steelblue", linetype = "solid"),
+        legend.text = element_text(size = 8))
+  #+guides(col = guide_legend(ncol = 2))
+    
+  print(plotdata)
+  
+  png(paste0(code_num, "_deathplot.png"), res = 80, width = 1000, height = 600)
+  print(plotdata)
+  dev.off() 
+  
+  return(age_freq)
+
+}
+```
+
+## G30 Alzheimer's disease
+
+```{r}
+# AD
+test_death("G30")
+```
+
+## I50 Heart failure-
+
+```{r}
+# CHF
+test_death("I50")
+```
+
+## J44 Other chronic obstructive pulmonary disease-
+
+```{r}
+# COPD
+test_death("J44")
+```
+
+## I21 Acute myocardial infarction-
+
+```{r}
+# Acute MI
+test_death("I21")
+```
+
+## I22 Subsequent myocardial infarction - NONE
+## I64 Stroke, not specified as haemorrhage or infarction 
+
+```{r}
+# Stroke
+test_death("I64")
+```
+
+## E11 Non-insulin-dependent diabetes mellitus-
+
+```{r}
+# Diabetes Type II
+test_death("E11")
+```
+
+## E14 Unspecified diabetes mellitus-
+
+```{r}
+# Unspecified Diabetes 
+test_death("E14")
+```
