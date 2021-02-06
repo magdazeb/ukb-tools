@@ -13,20 +13,20 @@ dataplotting <- function(list_exp, logbase = 10, age_min = 27, age_max = 80) {
   
   plotdata <- ggplot(data = list_exp[[1]], aes(x = `Age at Diagnosis`,
                                                y = `Incidence Rate`, 
-                                               color = category
-                                               #group = category
-  ), las = 3)+
-    geom_line(alpha = .15
-              #, aes(fill = category)
-    )+
+                                               color = category,
+                                               group = category), 
+                     las = 3, size = 5)+
+    geom_smooth(alpha = .15, aes(fill = category))+
     scale_x_continuous(limits = c(age_min, age_max), n.breaks = 10)+
     theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
     labs(y = "Incidence Rate", x = "Age at Diagnosis")+
-    theme_bw()
-  #theme(legend.position = "right", 
-  #legend.direction = "vertical",
-  #legend.background = element_rect(color = "steelblue", linetype = "solid"),
-  #legend.text = element_text(size = 8))
+    theme_bw()+
+    theme(legend.position = "right", 
+          legend.direction = "vertical",
+          legend.background = element_rect(color = "steelblue", 
+                                           linetype = "solid"),
+          legend.text = element_text(size = 8))
+  
   if (!is.null(logbase)) {
     plotdata <- plotdata+
       aes(y = log(`Incidence Rate`, logbase))+
@@ -35,6 +35,35 @@ dataplotting <- function(list_exp, logbase = 10, age_min = 27, age_max = 80) {
   print(list_exp[[2]])
   
   png(paste0(list_exp[[2]], "_", list_exp[[3]], "_", logbase, "_plot.png"),
+      res = 80,
+      width = 1000, height = 600)
+  
+  plotdata = plotdata
+  print(plotdata)
+  dev.off() 
+  
+}
+
+dataplotting_multiple <- function(list_exp, age_min = 27, age_max = 80) {
+  
+  if (is.null(list_exp)) {
+    return(NULL)
+  }
+  
+  plotdata <- ggplot(data = list_exp[[1]], aes(x = `Age at Diagnosis`,
+                                               y = `Incidence Rate`, 
+                                               color = category,
+                                               group = category), 
+                     las = 3, size = 5)+
+    geom_line(alpha = .5)+
+    scale_x_continuous(limits = c(age_min, age_max), n.breaks = 10)+
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+    labs(y = "Incidence Rate", x = "Age at Diagnosis")+
+    theme_bw()
+  
+  print(list_exp[[2]])
+  
+  png(paste0(list_exp[[2]], "_", list_exp[[3]], "_plot.png"),
       res = 80,
       width = 1000, height = 600)
   
@@ -200,5 +229,53 @@ multi_normalized_phecode <- function(code_nums, category_name, freq = 200) {
   
   multi_resultdf <- data.table::rbindlist(multi_result)
   
+  if (nrow(multi_resultdf) < 1) {
+    return(NULL)
+  }
+  
   return(list(multi_resultdf, category_name, "normalized_phecode"))
+}
+
+clustering_preprocess <- function(func_name, code_num) {
+  
+  clust_result <- totalage_freq[,c(1,3)]
+  
+  temp_result <- lapply(c(1:length(code_num)), function(i) {
+    temp_list <- func_name(code_num[i])
+    temp_df <- subset(temp_list[[1]],
+                      temp_list[[1]]$category != "Total Disease(n=3003823)")
+    colnames(temp_df)[3] <- temp_list[[2]]
+    
+    return(temp_df)
+  })
+  
+  for (i in 1:length(temp_result)) {
+    if (is.null(temp_result[[i]])) {
+      next
+    }
+    temp <- temp_result[[i]][,c(1,3)]
+    clust_result <- merge(clust_result, temp, 
+                          by = "Age at Diagnosis", all = TRUE)
+  }
+  
+  clust_result[,2] <- NULL
+  row.names(clust_result) <- clust_result[,1]
+  clust_result[,1] <- NULL
+  
+  clust_result <- as.matrix(clust_result)
+  clust_result[is.na(clust_result)] <- 0
+  
+  return(clust_result)
+}
+
+subsetting_cluster_result <- function(clust_result, age_cut = NULL){
+  
+  clust_result <- clust_result[1:(nrow(clust_result)-2),]
+  if (!is.null(age_cut)) {
+    max_age <- apply(clust_result, 2, which.max)
+    clust_result <- 
+      clust_result[, as.numeric(rownames(clust_result)[max_age]) 
+                   >= age_cut]
+  }
+  return(clust_result)
 }

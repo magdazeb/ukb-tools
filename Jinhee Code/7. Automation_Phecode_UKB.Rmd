@@ -1,0 +1,107 @@
+---
+title: "Phecode_UKB"
+author: "Jinhee Chang"
+date: "12/21/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+phecode_ukb <- readr::read_tsv('phecode-ukbb-agg.tsv')
+phecode_ukb$phecode <- sprintf("%.2f", phecode_ukb$phecode)
+```
+
+```{r}
+source("Automated_functioncode.R")
+
+for (i in (1:length(phecode_ukb$phecode))) {
+  dataplotting(normalized_phecode(phecode_ukb$phecode[i]), NULL)
+}
+```
+
+```{r}
+source("Automated_functioncode.R")
+
+clust_result_2 <- subsetting_cluster_result(preprocess_clustering, 60)
+```
+
+```{r}
+library("ComplexHeatmap")
+
+library(circlize)
+col_fun = colorRamp2(c(0, 1, 2, 4), c("white", "green", "yellow", "red"))
+
+Heatmap(clust_result, cluster_rows = FALSE, col = col_fun)
+Heatmap(clust_result_1, cluster_rows = FALSE, col = col_fun,
+        column_split = 8)
+Heatmap(clust_result_2, cluster_rows = FALSE, col = col_fun,
+        column_split = 8)
+```
+
+```{r}
+split = data.frame(cutree(hclust(dist(t(clust_result_2))), k = 8))
+
+split[,2] <- rownames(split)
+colnames(split) <- c("cluster", "phecode")
+
+a <- lapply(c(1:8), function(i) {
+  subset(split, cluster == i)
+  })
+
+split_cluster = list()
+for (i in 1:length(a)) {
+  split_cluster[[i]] <- merge(a[[i]],
+                              as.data.frame(phecode_ukb[,1:4]), 
+                              by = "phecode")
+}
+
+split_clusterdf <- data.table::rbindlist(split_cluster)
+
+Heatmap(clust_result_2, name = "clust_result_2", 
+        column_split = split[,1],
+        cluster_rows = FALSE, col = col_fun)
+```
+
+```{r}
+source("Automated_functioncode.R")
+
+phecode_cluster = list()
+for (i in 1:length(split_cluster)) {
+  phecode_cluster[[i]] <-
+    multi_normalized_phecode(split_cluster[[i]]$phecode, i)
+  print(i)
+}
+
+for (i in 1:length(phecode_cluster)) {
+  dataplotting_multiple(phecode_cluster[[i]])
+  print(i)
+}
+```
+
+```{r}
+unique_category <- unique(phecode_ukb$category)
+
+category_phecode = list()
+for (i in 1:length(unique_category)) {
+  
+  category_phecode[[i]] <- as.data.frame(subset(phecode_ukb, category ==
+                                                  unique_category[i])[,1])
+}
+
+source("Automated_functioncode.R")
+
+category_result = list()
+for (i in 1:length(unique_category)) {
+  category_result[[i]] <- multi_normalized_phecode(category_phecode[[i]]$phecode,
+                                                   unique_category[i])
+}
+
+category_result[[3]][[2]] <- "endocrine_metabolic"
+for (i in 13:length(category_result)) {
+  dataplotting_multiple(category_result[[i]])
+  print(i)
+}
+```
