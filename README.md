@@ -210,3 +210,89 @@ Usage examples for ukb_excld:
 
    To identify the subjects who don't had hysterectomy, bilateral oophorectomy, and hormone-replacement therapy (HRT), exclude answers of ever had question is Yes as well as data existing in ages at hyterectomy, bilateral oophorectomy, and HRT.
 
+
+
+# Age-related diseases: ICD-10 code
+
+## 1. Calculating ICD-10 background incidence
+
+Preparing total incidence of ICD-10 data as background. Save the result as RDS file for later use.
+
+```R
+library(dplyr)
+
+# Read data
+master6 <- readRDS("Jinhee Code/master_6.rds")
+master6_icd10 = subset(master6,ICD9.ICD10=='ICD10')
+ICD10_Code_ann = read.delim('ICD10_DataCoding_41270.tsv')
+
+# Calculate the total incidence of ICD-10
+source('10. Automation_ICD10_UKB.r'); total_icd10_freq = original(master6_icd10, code_num=NULL, ICD10_Code_ann, totalage_freq=NULL, subgroup=FALSE)[[1]]
+
+# Save as RDS file
+saveRDS(total_icd10_freq,'total_icd10_freq.rds')
+
+# Create barplot of total ICD-10 disease incidences
+total_icd10_freq_vec = total_icd10_freq$Frequency
+names(total_icd10_freq_vec) = total_icd10_freq$`Age at Diagnosis`
+png('fig/total_icd10_freq.png')
+barplot(total_icd10_freq_vec,main='Total ICD-10 incidences',xlab='Age at Diagnosis')
+dev.off()
+```
+
+![](C:\Users\sk4748\Documents\GitHub\ukb-tools\fig\total_icd10_freq.png)
+
+
+
+## 2. Preprocessing for ICD-10
+
+Calculating incidence of each ICD10 codes.
+
+```R
+library(dplyr)
+
+# Read data
+#totalage_freq = readRDS('Jinhee Code/totalage_freq.rds')
+master6         = readRDS("Jinhee Code/master_6.rds")
+master6_icd10   = subset(master6,ICD9.ICD10=='ICD10')
+ICD10_Code_ann  = read.delim('ICD10_DataCoding_41270.tsv')
+total_icd10_freq = readRDS('total_icd10_freq.rds')
+
+# Calculate normalized incidence rate of ICD10
+icd10 = master6_icd10$Disease_Code %>% as.character %>% unique %>% sort
+
+# Run clustering_preprocess
+source('10. Automation_ICD10_UKB.r')
+clust_result = clustering_preprocess(
+    master         = master6_icd10,
+    code_num       = icd10,
+    ICD10_Code_ann = ICD10_Code_ann,
+    totalage_freq  = total_icd10_freq,
+    subgroup       = FALSE)
+
+saveRDS(clust_result,'clust_result_icd10.rds')
+
+# debugging for 6963/11726 O16
+source('10. Automation_ICD10_UKB.r'); clust_result = clustering_preprocess(master6_icd10, "O16", ICD10_Code_ann, total_icd10_freq, FALSE)
+```
+
+
+
+## 3. Draw heatmap of ICD-10 normalized incidences
+
+* [See R color palette](https://kbroman.files.wordpress.com/2014/05/crayons.png)
+* `library(colorspace)` [ref](https://www.r-bloggers.com/2019/01/colorspace-new-tools-for-colors-and-palettes/), [fig](https://i2.wp.com/eeecon.uibk.ac.at/~zeileis/assets/posts/2019-01-14-colorspace/hcl-palettes-1.png?ssl=1)
+
+```R
+library(dplyr)
+library(ComplexHEatmap)
+library(circlize)
+
+# Read data
+clust_result = readRDS('clust_result_icd10.rds')
+clust_result2 = subsetting_cluster_result(preprocess_clustering, 60)
+
+# Configurations
+col_fun = colorRamp2(c(0,1,2,3,4), c("white","Sky Blue","Electric Lime","yellow","red"))
+```
+
