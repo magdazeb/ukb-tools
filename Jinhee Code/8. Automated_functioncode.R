@@ -75,7 +75,7 @@ dataplotting_multiple <- function(list_exp, age_min = 27, age_max = 80) {
 
 ##Function that creates incidence rate of subset disease, total disease and total age distribution
 # code_num: Disease code from ICD10
-original <- function(code_num, freq = 200) {
+original <- function(master6, code_num, ICD10_Code, freq = 200) {
   
   result <- master6[grep(code_num, master6$Disease_Code), ]
   subset_name <- result %>% distinct(Disease_Code)
@@ -118,7 +118,7 @@ original <- function(code_num, freq = 200) {
 
 ##Function that creates incidence rate of subset disease, total disease and total age distribution
 # code_num: Disease code from ICD10
-original_ICD9 <- function(code_num, freq = 200) {
+original_ICD9 <- function(master6, code_num, freq = 200) {
   
   result1 <- master6[grep(code_num, master6$Disease_Code), ]
   
@@ -156,7 +156,7 @@ original_ICD9 <- function(code_num, freq = 200) {
 }
 
 ##Function that normalize the incidence rate based on total age incidence rate
-normalized <- function(code_num, freq = 200, totalagedf = totalage_freq) {
+normalized <- function(master6, code_num, ICD10_Code, freq = 200, totalagedf = totalage_freq) {
   
   result <- master6[grep(code_num, master6$Disease_Code), ]
   
@@ -164,7 +164,12 @@ normalized <- function(code_num, freq = 200, totalagedf = totalage_freq) {
     return(NULL)
   }
   
-  normalizeddf <- merge(x = original_ICD9(code_num)[[1]], y = totalagedf, by = "Age at Diagnosis", all = TRUE)
+  #normalizeddf <- merge(x = original_ICD9(code_num)[[1]], y = totalagedf, by = "Age at Diagnosis", all = TRUE)
+  normalizeddf <- merge(
+    x = original(master6, code_num, ICD10_Code)[[1]],
+    y = totalagedf,
+    by = "Age at Diagnosis",
+    all = TRUE)
   normalizeddf <- na.omit(normalizeddf)
   normalizeddf$`Normalized Incidence Rate` = normalizeddf$`Incidence Rate.x`/normalizeddf$`Incidence Rate.y`
   normalizeddf <- normalizeddf %>% select(1,4,8)
