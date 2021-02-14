@@ -227,7 +227,13 @@ master6_icd10 = subset(master6,ICD9.ICD10=='ICD10')
 ICD10_Code_ann = read.delim('ICD10_DataCoding_41270.tsv')
 
 # Calculate the total incidence of ICD-10
-source('10. Automation_ICD10_UKB.r'); total_icd10_freq = original(master6_icd10, code_num=NULL, ICD10_Code_ann, totalage_freq=NULL, subgroup=FALSE)[[1]]
+source('10. Automation_ICD10_UKB.r')
+total_icd10_freq = original(
+    master6_icd10, 
+    code_num=NULL, 
+    ICD10_Code_ann, 
+    totalage_freq=NULL, 
+    subgroup=FALSE)[[1]]
 
 # Save as RDS file
 saveRDS(total_icd10_freq,'total_icd10_freq.rds')
@@ -240,7 +246,44 @@ barplot(total_icd10_freq_vec,main='Total ICD-10 incidences',xlab='Age at Diagnos
 dev.off()
 ```
 
-![](C:\Users\sk4748\Documents\GitHub\ukb-tools\fig\total_icd10_freq.png)
+![](fig/total_icd10_freq.png)
+
+### Example 1: Age-related diseases
+
+![](fig/ARD.png)
+
+This is the plot from UKB self-reported data.
+
+Draw incidence rate plot for major age-relaed diseases and its subgroups.
+
+```R
+source('10. Automation_ICD10_UKB.r')
+dis = c("G30", "E11", "E14", "I21", "I22", "I50", "I64", "J44")
+f_dir = 'fig'
+
+for(i in 1:length(dis)) {
+    # Prepare data
+    inc_rate = original(master6,dis[i],ICD10_Code_ann,200,total_icd10_freq,TRUE)
+    inc_norm = normalized(master6,dis[i],ICD10_Code_ann,200,total_icd10_freq,TRUE)
+
+    # Draw plots
+    dataplotting(inc_rate,logbase=10,age_min=40,age_max=80,f_dir)
+    dataplotting(inc_norm,logbase=10,age_min=40,age_max=80,f_dir)
+}
+```
+
+[ISSUE] Why background start late? <- Check!
+
+| Disease                                                      | Incidence rate               | Normalized incidence rate      |
+| ------------------------------------------------------------ | ---------------------------- | ------------------------------ |
+| G30 Alzheimer's disease (AD)                                 | ![](fig/G30_original_10.png) | ![](fig/G30_normalized_10.png) |
+| I50 Heart failure (CHF)                                      | ![](fig/I50_original_10.png) | ![](fig/I50_normalized_10.png) |
+| J44 Other chronic obstructive pulmonary disease (COPD)       | No plot (N<200)              | No plot (N<200)                |
+| I21 Acute myocardial infarction (Acute MI)                   | ![](fig/I21_original_10.png) | ![](fig/I21_normalized_10.png) |
+| I22 Subsequent myocardial infarction (Subsequent MI)         | ![](fig/I22_original_10.png) | ![](fig/I22_normalized_10.png) |
+| I64 Stroke, not specified as haemorrhage or infarction  1432 | No plot (N<200)              | No plot (N<200)                |
+| E11 Non-insulin-dependent diabetes mellitus (Diabetes Type II) | ![](fig/E11_original_10.png) | ![](fig/E11_normalized_10.png) |
+| E14 Unspecified diabetes mellitus (Unspecified Diabetes)     | ![](fig/E14_original_10.png) | ![](fig/E14_normalized_10.png) |
 
 
 
@@ -253,15 +296,16 @@ library(dplyr)
 
 # Read data
 #totalage_freq = readRDS('Jinhee Code/totalage_freq.rds')
-master6         = readRDS("Jinhee Code/master_6.rds")
-master6_icd10   = subset(master6,ICD9.ICD10=='ICD10')
-ICD10_Code_ann  = read.delim('ICD10_DataCoding_41270.tsv')
+master6          = readRDS("Jinhee Code/master_6.rds")
+master6_icd10    = subset(master6,ICD9.ICD10=='ICD10')
+ICD10_Code_ann   = read.delim('ICD10_DataCoding_41270.tsv')
 total_icd10_freq = readRDS('total_icd10_freq.rds')
 
 # Calculate normalized incidence rate of ICD10
 icd10 = master6_icd10$Disease_Code %>% as.character %>% unique %>% sort
 
 # Run clustering_preprocess
+## Minimum incidence criteria: 200
 source('10. Automation_ICD10_UKB.r')
 clust_result = clustering_preprocess(
     master         = master6_icd10,
@@ -273,8 +317,27 @@ clust_result = clustering_preprocess(
 saveRDS(clust_result,'clust_result_icd10.rds')
 
 # debugging for 6963/11726 O16
-source('10. Automation_ICD10_UKB.r'); clust_result = clustering_preprocess(master6_icd10, "O16", ICD10_Code_ann, total_icd10_freq, FALSE)
+#source('10. Automation_ICD10_UKB.r'); clust_result = clustering_preprocess(master6_icd10, "O16", ICD10_Code_ann, total_icd10_freq, FALSE)
 ```
+
+> ** Run clustering_preprocess **
+>
+> Processing 11726 iterations:
+>
+>
+>   100/11726 A392 Job process: 33.9 sec
+>
+>   200/11726 B000 Job process: 1.1 min
+>
+> ...
+>
+>   11600/11726 Z851 Job process: 1.3 hr
+>
+>   11700/11726 Z961 Job process: 1.3 hr
+>
+> Merging data = 41  2090 -> done
+>
+> Job done: 2021-02-13 20:31:55 for 1.3 hr
 
 
 
@@ -285,14 +348,71 @@ source('10. Automation_ICD10_UKB.r'); clust_result = clustering_preprocess(maste
 
 ```R
 library(dplyr)
-library(ComplexHEatmap)
-library(circlize)
 
 # Read data
 clust_result = readRDS('clust_result_icd10.rds')
-clust_result2 = subsetting_cluster_result(preprocess_clustering, 60)
 
-# Configurations
-col_fun = colorRamp2(c(0,1,2,3,4), c("white","Sky Blue","Electric Lime","yellow","red"))
+# Prepare sub-sets
+## clust_result:  41 2089; original data
+## clust_result2: 41  873; peak age over 60
+## clust_result3: 36  784; peak age over 60 & remove top 1 and bottom 2 rows (< 1,500 incidences)
+source('10. Automation_ICD10_UKB.r')
+clust_result2 = subsetting_cluster_result(clust_result, 0,0, 60)
+clust_result3 = subsetting_cluster_result(clust_result, 4,2, 60)
 ```
+
+Draw total 2,089 ICD-10 diseases heatmap
+
+```R
+col_fun = colorRamp2(c(0,1,2,3,4), c("white","Sky Blue","yellow Green","yellow","red"))
+png('fig/clust_result.png', width=25,height=8, units='in', res=150)
+Heatmap(clust_result, cluster_rows = FALSE, col = col_fun)
+dev.off()
+```
+
+![](fig/clust_result.png)
+
+Draw 873 diseases filtered by peak age after 60 years
+
+```R
+col_fun = colorRamp2(c(0,1,2,3,4), c("white","Sky Blue","yellow Green","yellow","red"))
+png('fig/clust_result_peak60.png', width=25,height=8, units='in', res=150)
+Heatmap(clust_result2, cluster_rows = FALSE, col = col_fun)
+dev.off()
+```
+
+![](fig/clust_result_peak60.png)
+
+Draw 784 diseases with peak age after 60 years and removed top 4 and bottom 2 rows (< 1,500 incidences)
+
+```R
+# set configurations
+i = 3
+wh = c(25,8)
+col_split = c(8,12,20)
+f_name = paste0('fig/clust_result_peak60_2,4trimed_',col_split[i],'.png')
+col_fun = colorRamp2(c(0,1,2,3,4), c("white","Sky Blue","yellow Green","yellow","red"))
+
+# Draw heatmaps
+png(f_name, width=25,height=8, units='in', res=150)
+Heatmap(clust_result3, cluster_rows = FALSE, col = col_fun, column_split = col_split[i])
+dev.off()
+
+# Kill all graphics objects
+graphics.off()
+```
+
+![](fig/clust_result_peak60_2,4trimed_20.png)
+
+
+
+## 4. Extract clustered data
+
+
+
+
+
+# Age-related diseases: Phecode
+
+## 1. Calculating phecode background incidence
 
