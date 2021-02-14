@@ -1,14 +1,13 @@
 ### libraries ###
 
-library(dplyr)
-library(tidyr)
-library(future.apply)
+suppressMessages(library(dplyr))
+suppressMessages(library(tidyr))
 
 
 ### functions ###
 
 ##Function that creates incidence rate of subset disease, total disease and total age distribution
-# code_num: Disease code from ICD10
+# code_num: Disease code from ICD-10
 original <- function(
     master = NULL,
     code_num = NULL,
@@ -62,10 +61,12 @@ original <- function(
         })
         subset_li = subset_list[!sapply(subset_list,is.null)]
         if(length(subset_li)>0) {
-            totaldataframe <- data.table::rbindlist(subset_li)
-            colnames(totaldataframe) = col_nm
+            subgroups_df <- data.table::rbindlist(subset_li)
+            colnames(subgroups_df) = col_nm
+            subgroups_df$`Age at Diagnosis` <- as.character(subgroups_df$`Age at Diagnosis`) %>% as.numeric
+            subgroups_df$category <- as.factor(subgroups_df$category)
         } else return(NULL)
-    } else totaldataframe = NULL
+    } else subgroups_df = NULL
     
     # Count incidence of code_num (total)
     age_freq <- as.data.frame(table(floor(master_sub$Diagnosed_age)))
@@ -78,6 +79,8 @@ original <- function(
             `Disease ID` = code_num
         )
         colnames(age_freq) = col_nm
+        age_freq$`Age at Diagnosis` <- as.character(age_freq$`Age at Diagnosis`) %>% as.numeric
+        age_freq$category <- as.factor(age_freq$category)
     } else return(NULL)
 
     # Add "Disease ID" column to totalage_freq
@@ -87,11 +90,8 @@ original <- function(
         totalage_freq = data.frame(totalage_freq,`Disease ID` = "total")
         colnames(totalage_freq) = col_nm
     }
-    
-    total_res <- rbind(age_freq, totaldataframe, totalage_freq)
-    total_res$`Age at Diagnosis` <- as.character(total_res$`Age at Diagnosis`) %>% as.numeric
-    total_res$category <- as.factor(total_res$category)
-  
+
+    total_res <- rbind(age_freq, subgroups_df, totalage_freq)
     return(list(total_res, code_num, "original"))
 }
 
@@ -125,14 +125,21 @@ normalized <- function(
         normalized_merge <- na.omit(normalized_merge)
         normalized_merge$`Normalized Incidence Rate` = normalized_merge$`Incidence Rate.x`/normalized_merge$`Incidence Rate.y`
         normalized_res <- normalized_merge %>% select(`Age at Diagnosis`,`category`,`Normalized Incidence Rate`,`Disease ID`)
-        #colnames(normalized_df) <- c("Age at Diagnosis", "category", "Incidence Rate")
+        colnames(normalized_res) <- c("Age at Diagnosis", "category", "Incidence Rate", "Disease ID")
     } else return(NULL)
   
     return(list(normalized_res, code_num, "normalized"))
 }
 
 
-clustering_preprocess <- function(master, code_num, ICD10_Code_ann, totalage_freq, subgroup = TRUE) {
+clustering_preprocess <- function(
+    master = NULL, 
+    code_num = NULL, 
+    ICD10_Code_ann = NULL, 
+    totalage_freq = NULL, 
+    subgroup = TRUE
+) {
+    library(future.apply)
     source('src/pdtime.r')
     t0=Sys.time()
     
@@ -175,6 +182,77 @@ clustering_preprocess <- function(master, code_num, ICD10_Code_ann, totalage_fre
     
     paste0('\n',pdtime(t0,1),'\n') %>% cat
     return(clust_result)
+}
+
+
+dataplotting <- function(
+    list_exp = NULL, 
+    logbase = 10, 
+    age_min = 27, 
+    age_max = 80,
+    f_dir = NULL
+) {
+    suppressMessages(library(ggplot2))
+    if (is.null(list_exp)) return(NULL)
+    
+    p <- ggplot(data = list_exp[[1]],
+        aes(x = `Age at Diagnosis`,
+            y = `Incidence Rate`, 
+            color = category,
+            group = category
+        ), las = 3, size = 5)+
+        geom_smooth(alpha = .15, aes(fill = category))+
+        scale_x_continuous(limits = c(age_min, age_max), n.breaks = 10)+
+        theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+        labs(y = "Incidence Rate", x = "Age at Diagnosis")+
+        theme_bw()+
+        theme(legend.position = "right", 
+            legend.direction = "vertical",
+            legend.background = element_rect(color = "steelblue", linetype = "solid"),
+            legend.text = element_text(size = 8))
+  
+    if (!is.null(logbase)) {
+        p <- p+aes(y = log(`Incidence Rate`, logbase))+
+            labs(y = paste0("log", logbase, "(Incidence Rate)"))
+    }
+    print(list_exp[[2]])
+    
+    f_name = paste0(f_dir,'/',list_exp[[2]], "_", list_exp[[3]], "_", logbase, ".png")
+    ggsave(f_name,p,width=10,height=6,units='in')
+}
+
+
+subsetting_cluster_result <- function(
+    clust_result = NULL, 
+    over = 0, # cut row from top to remove outliers
+    less = 0, # cut row from bottom to remove outliers
+    age_cut = NULL # find peak age over this criteria
+) {
+    clust_result <- clust_result[over:(nrow(clust_result)-less),]
+    if (!is.null(age_cut)) {
+        max_age <- apply(clust_result, 2, which.max)
+        clust_result <- 
+            clust_result[, as.numeric(rownames(clust_result)[max_age]) >= age_cut]
+    }
+    return(clust_result)
+}
+
+
+draw_hm = function(
+    hm_mat = NULL,
+    f_name = NULL, 
+    column_split = NULL
+) {
+    suppressMessages(library(ComplexHeatmap))
+    suppressMessages(library(circlize))
+
+    col_fun = colorRamp2(c(0,1,2,3,4), c("white","Sky Blue","yellow Green","yellow","red"))
+
+    png(f_name, width=wh[1], height=wh[2], units='in', res=150)
+    Heatmap(hm_mat, cluster_rows = FALSE, col = col_fun, column_split = column_split[i])
+    paste0('Draw plot: ',f_name,'\n') %>% cat
+    dev.off()
+    #graphics.off()
 }
 
 
