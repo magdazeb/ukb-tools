@@ -132,6 +132,69 @@ normalized <- function(
 }
 
 
+multi_normalized = function(
+    master = NULL,
+    code_num = NULL,
+    ICD10_Code_ann = NULL, 
+    totalage_freq = NULL, 
+    subgroup = TRUE
+) {
+    library(future.apply)
+
+    #paste0('\n** Run multi_normalized **\n\n') %>% cat
+    n = length(code_num); m = 100
+    paste0('Processing ',n,' iterations:\n') %>% cat
+    norm_result <- future_lapply(c(1:n), function(i) {
+        if(i%%m==0) {paste0('  ',i,'/',n,' ',code_num[i],' ',pdtime(t0,2),'\n') %>% cat}
+
+        norm_df <- normalized(master, code_num[i],
+            ICD10_Code_ann, 200, totalage_freq, subgroup)[[1]]
+        if(!is.null(norm_df)) { 
+            #tmp_df <- subset(tmp_list[[1]],tmp_list[[1]]$category != "Total Disease(n=3003823)")
+            #colnames(temp_df)[3] <- tmp_list[[2]]
+            #subset(norm_df,`Disease ID` != "total")
+            return(norm_df)
+        } else return(NULL)
+    })
+    
+    return(norm_result)
+}
+
+
+normalized_by_cat = function(
+    master = NULL,
+    cat_code = NULL,
+    ICD10_Code_ann = NULL, 
+    totalage_freq = NULL, 
+    subgroup = FALSE
+) {
+    library(future.apply)
+    source('src/pdtime.r')
+    t0=Sys.time()
+
+    paste0('\n** Run normalized_by_cat **\n\n') %>% cat
+    categories = cat_code[,1] %>% unique
+    n = length(categories);
+    paste0('Processing ',n,' iterations:\n') %>% cat
+    cat_res_li = lapply(c(1:n),function(i) {
+        paste0('  ',i,'/',n,' ',categories[i],' = ') %>% cat
+        code_num = cat_code[which(cat_code[,1] %in% categories[i]),2] %>% unique
+
+        m = length(code_num)
+        paste0(m,' -> ') %>% cat
+        norm_li = lapply(c(1:m), function(j) {
+            norm_df <- normalized(master, code_num[j],
+                ICD10_Code_ann, 200, totalage_freq, subgroup)[[1]]
+        })
+        norm_rbind = data.table::rbindlist(norm_li) %>% unique
+        paste0(dim(norm_rbind),collapse=' ') %>% cat
+        paste0('; ',pdtime(t0,2)) %>% cat
+
+        return(list(norm_rbind, categories[i], "normalized"))
+    })
+}
+
+
 clustering_preprocess <- function(
     master = NULL, 
     code_num = NULL, 
@@ -139,26 +202,12 @@ clustering_preprocess <- function(
     totalage_freq = NULL, 
     subgroup = TRUE
 ) {
-    library(future.apply)
     source('src/pdtime.r')
     t0=Sys.time()
     
     paste0('\n** Run clustering_preprocess **\n\n') %>% cat
-    n = length(code_num); m = 100
-    paste0('Processing ',n,' iterations: \n') %>% cat
-    norm_result <- future_lapply(c(1:n), function(i) {
-        #paste0(i,'/',n,' ',code_num[i],'\n') %>% cat # for debug
-        if(i%%m==0) {paste0('  ',i,'/',n,' ',code_num[i],' ',pdtime(t0,2),'\n') %>% cat}
-
-        norm_df <- normalized(master, code_num[i],
-            ICD10_Code_ann, 200, totalage_freq, subgroup)[[1]]
-        if(!is.null(norm_df)) {
-            #tmp_df <- subset(tmp_list[[1]],tmp_list[[1]]$category != "Total Disease(n=3003823)")
-            #colnames(temp_df)[3] <- tmp_list[[2]]
-            #subset(norm_df,`Disease ID` != "total")
-            return(norm_df)
-        } else return(NULL)
-    })
+    norm_result <- multi_normalized(
+        master, code_num, ICD10_Code_ann, totalage_freq, subgroup)
     norm_result_df = data.table::rbindlist(norm_result) %>% unique
 
     paste0('Merging data = ') %>% cat
@@ -180,7 +229,7 @@ clustering_preprocess <- function(
     clust_result[is.na(clust_result)] <- 0
     paste0('-> done\n') %>% cat
     
-    paste0('\n',pdtime(t0,1),'\n') %>% cat
+    paste0('\n',pdtime(t0,1)) %>% cat
     return(clust_result)
 }
 
@@ -219,6 +268,51 @@ dataplotting <- function(
     
     f_name = paste0(f_dir,'/',list_exp[[2]], "_", list_exp[[3]], "_", logbase, ".png")
     ggsave(f_name,p,width=10,height=6,units='in')
+}
+
+
+dataplotting_multi =  function(
+    list_exp = NULL,
+    cut_top = NULL,
+    cut_bottom = NULL,
+    out = 'fig'
+) {
+  
+    if (is.null(list_exp)) return(NULL)
+    if(!is.null(cut_top) | is.null(cut_bottom)) {
+        if(is.null(cut_top)) cut_top = 0
+        if(is.null(cut_bottom)) cut_bottom = 0
+        age = list_exp[[1]]$`Age at Diagnosis` %>% unique %>% sort
+        k = 1+cut_top
+        l = length(age)-cut_bottom
+        age_sub = age[c(k:l)]
+        tb = subset(list_exp[[1]],`Age at Diagnosis` %in% age_sub)
+    } else tb = list_exp[[1]]
+
+    dis_num = 
+    plotdata <- ggplot(data = tb, 
+        aes(x = `Age at Diagnosis`,
+            y = `Incidence Rate`,
+            group = category),
+        las=1, size=3)+
+        geom_line(color="gray40", alpha = .5)+
+        scale_x_continuous(n.breaks = 10)+ #limits = c(age_min, age_max)
+        theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+        geom_hline(yintercept=1, linetype="dashed",color="black")+
+        #geom_smooth(method="loess")+
+        labs(y = "Incidence Rate", x = "Age at Diagnosis")+
+        theme_bw()
+  
+    print(list_exp[[2]])
+  
+    f_name = paste0(out,'/',list_exp[[2]],"_",list_exp[[3]],
+        "_cut_",cut_top,',',cut_bottom,"_plot.png")
+    png(f_name, width=5,height=4, unit='in', res = 300)
+  
+    plotdata = plotdata + theme(legend.position = "none")
+    print(plotdata)
+    dev.off() 
+  
 }
 
 

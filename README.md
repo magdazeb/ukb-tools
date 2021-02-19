@@ -227,7 +227,7 @@ master6_icd10 = subset(master6,ICD9.ICD10=='ICD10')
 ICD10_Code_ann = read.delim('ICD10_DataCoding_41270.tsv')
 
 # Calculate the total incidence of ICD-10
-source('10. Automation_ICD10_UKB.r')
+source('src/ard.r')
 total_icd10_freq = original(
     master6_icd10, 
     code_num=NULL, 
@@ -248,7 +248,7 @@ dev.off()
 
 ![](fig/total_icd10_freq.png)
 
-### Example 1: Age-related diseases
+### Examples: Age-related diseases
 
 ![](fig/ARD.png)
 
@@ -257,7 +257,7 @@ This is the plot from UKB self-reported data.
 Draw incidence rate plot for major age-relaed diseases and its subgroups.
 
 ```R
-source('10. Automation_ICD10_UKB.r')
+source('src/ard.r')
 dis = c("G30", "E11", "E14", "I21", "I22", "I50", "I64", "J44")
 f_dir = 'fig'
 
@@ -271,8 +271,6 @@ for(i in 1:length(dis)) {
     dataplotting(inc_norm,logbase=10,age_min=40,age_max=80,f_dir)
 }
 ```
-
-[ISSUE] Why background start late? <- Check!
 
 | Disease                                                      | Incidence rate               | Normalized incidence rate      |
 | ------------------------------------------------------------ | ---------------------------- | ------------------------------ |
@@ -306,7 +304,7 @@ icd10 = master6_icd10$Disease_Code %>% as.character %>% unique %>% sort
 
 # Run clustering_preprocess
 ## Minimum incidence criteria: 200
-source('10. Automation_ICD10_UKB.r')
+source('src/ard.r')
 clust_result = clustering_preprocess(
     master         = master6_icd10,
     code_num       = icd10,
@@ -356,17 +354,17 @@ clust_result = readRDS('clust_result_icd10.rds')
 ## clust_result:  41 2089; original data
 ## clust_result2: 41  873; peak age over 60
 ## clust_result3: 36  784; peak age over 60 & remove top 1 and bottom 2 rows (< 1,500 incidences)
-source('10. Automation_ICD10_UKB.r')
+source('src/ard.r')
 clust_result2 = subsetting_cluster_result(clust_result, 0,0, 60)
 clust_result3 = subsetting_cluster_result(clust_result, 4,2, 60)
+col_fun = colorRamp2(c(0,1,2,3,4,7,10), c("white","Sky Blue","yellow Green","yellow","red","purple","black"))
 ```
 
 Draw total 2,089 ICD-10 diseases heatmap
 
 ```R
-col_fun = colorRamp2(c(0,1,2,3,4), c("white","Sky Blue","yellow Green","yellow","red"))
 png('fig/clust_result.png', width=25,height=8, units='in', res=150)
-Heatmap(clust_result, cluster_rows = FALSE, col = col_fun)
+Heatmap(clust_result, cluster_rows = FALSE, col = col_fun, column_dend_height=unit(1.5,'in'))
 dev.off()
 ```
 
@@ -375,9 +373,8 @@ dev.off()
 Draw 873 diseases filtered by peak age after 60 years
 
 ```R
-col_fun = colorRamp2(c(0,1,2,3,4), c("white","Sky Blue","yellow Green","yellow","red"))
 png('fig/clust_result_peak60.png', width=25,height=8, units='in', res=150)
-Heatmap(clust_result2, cluster_rows = FALSE, col = col_fun)
+Heatmap(clust_result2, cluster_rows = FALSE, col = col_fun, column_dend_height=unit(1.5,'in'))
 dev.off()
 ```
 
@@ -391,11 +388,10 @@ i = 3
 wh = c(25,8)
 col_split = c(8,12,20)
 f_name = paste0('fig/clust_result_peak60_2,4trimed_',col_split[i],'.png')
-col_fun = colorRamp2(c(0,1,2,3,4), c("white","Sky Blue","yellow Green","yellow","red"))
 
 # Draw heatmaps
 png(f_name, width=25,height=8, units='in', res=150)
-Heatmap(clust_result3, cluster_rows = FALSE, col = col_fun, column_split = col_split[i])
+Heatmap(clust_result3, cluster_rows = FALSE, col = col_fun, column_split = col_split[i], column_dend_height=unit(1.5,'in'))
 dev.off()
 
 # Kill all graphics objects
@@ -406,7 +402,95 @@ graphics.off()
 
 
 
-## 4. Extract clustered data
+## 4. Extract clustered data & draw plots
+
+split data by hclust
+
+```R
+k = 20
+f_name = paste0('fig/clust_result_peak60_2,4trimed_',k,'-re.png')
+code_nm = 'ICD-10'
+split = data.frame(cutree(hclust(dist(t(clust_result3))), k = k))
+split[,2] = rownames(split)
+colnames(split) = c('cluster',code_nm)
+
+png(f_name, width=25,height=7, units='in', res=150)
+Heatmap(clust_result3, column_split=split[,1], cluster_rows=FALSE, col=col_fun, column_dend_height=unit(1.5,'in'))
+dev.off()
+```
+
+![](fig/clust_result_peak60_2,4trimed_20-re.png)
+
+Draw correlation matrix
+
+```R
+library(corrplot)
+cor_mat = cor(clust_result3, method="spearman")
+f_name = paste0('fig/clust_result_peak60_2,4trimed_',k,'-corr.png')
+
+png(f_name, width=25,height=25, units='in', res=150)
+corrplot(cor_mat, method='square', tl.col="black", order="hclust", tl.cex=0.7)
+dev.off()
+```
+
+![](fig/clust_result_peak60_2,4trimed_20-corr.png)
+
+Draw normalized incidence rate as line plot by cluster
+
+```R
+source('src/ard.r')
+dis_cluster = normalized_by_cat(
+    master         = master6_icd10,
+    cat_code       = split,
+    ICD10_Code_ann = ICD10_Code_ann,
+    totalage_freq  = total_icd10_freq,
+    subgroup       = FALSE)
+```
+
+> ** Run normalized_by_cat **
+>
+> Processing 20 iterations:
+>   1/20 1 = 317 -> 10306 4; Job process: 3.5 min
+>   2/20 2 = 117 -> 3490 4; Job process: 4.9 min
+>   3/20 3 = 2 -> 88 4; Job process: 4.9 min
+>   4/20 4 = 41 -> 1335 4; Job process: 5.3 min
+>   5/20 5 = 2 -> 101 4; Job process: 5.3 min
+>   6/20 6 = 59 -> 2010 4; Job process: 6 min
+>   7/20 7 = 145 -> 4662 4; Job process: 7.6 min
+>   8/20 8 = 21 -> 683 4; Job process: 7.8 min
+>   9/20 9 = 9 -> 314 4; Job process: 7.9 min
+>   10/20 10 = 36 -> 1017 4; Job process: 8.4 min
+>   11/20 11 = 8 -> 214 4; Job process: 8.5 min
+>   12/20 12 = 6 -> 245 4; Job process: 8.5 min
+>   13/20 13 = 2 -> 82 4; Job process: 8.5 min
+>   14/20 14 = 5 -> 157 4; Job process: 8.6 min
+>   15/20 15 = 3 -> 127 4; Job process: 8.6 min
+>   16/20 16 = 3 -> 132 4; Job process: 8.7 min
+>   17/20 17 = 3 -> 95 4; Job process: 8.7 min
+>   18/20 18 = 2 -> 76 4; Job process: 8.7 min
+>   19/20 19 = 2 -> 107 4; Job process: 8.8 min
+>   20/20 20 = 1 -> 69 4; Job process: 8.8 min
+
+```R
+source('src/ard.r')
+#for (i in 1:length(dis_cluster)) {
+for (i in 1:1) {
+    dataplotting_multi(
+        dis_cluster[[i]],
+        cut_top = 4,
+        cut_bottom = 2,
+        out='fig/cluster'
+    )
+}
+
+source('src/ard.r')
+dataplotting_multi(
+        dis_cluster[[1]],
+        cut_top = 0,
+        cut_bottom = 0,
+        out='fig/cluster'
+    )
+```
 
 
 
@@ -415,4 +499,36 @@ graphics.off()
 # Age-related diseases: Phecode
 
 ## 1. Calculating phecode background incidence
+
+```R
+library(dplyr)
+
+# Read data
+master6 <- readRDS("Jinhee Code/master_6.rds")
+phecodes = read.delim("phecode-ukbb-agg.tsv",stringsAsFactors=F)
+phecodes$phecode <- sprintf("%.2f", phecodes$phecode)
+
+#### Archieve code ###
+master6_icd10 = subset(master6,ICD9.ICD10=='ICD10')
+ICD10_Code_ann = read.delim('ICD10_DataCoding_41270.tsv')
+
+# Calculate the total incidence of ICD-10
+source('src/ard.r')
+total_icd10_freq = original(
+    master6_icd10, 
+    code_num=NULL, 
+    ICD10_Code_ann, 
+    totalage_freq=NULL, 
+    subgroup=FALSE)[[1]]
+
+# Save as RDS file
+saveRDS(total_icd10_freq,'total_icd10_freq.rds')
+
+# Create barplot of total ICD-10 disease incidences
+total_icd10_freq_vec = total_icd10_freq$Frequency
+names(total_icd10_freq_vec) = total_icd10_freq$`Age at Diagnosis`
+png('fig/total_icd10_freq.png')
+barplot(total_icd10_freq_vec,main='Total ICD-10 incidences',xlab='Age at Diagnosis')
+dev.off()
+```
 
