@@ -11,61 +11,84 @@ suppressMessages(library(tidyr))
 original <- function(
     master = NULL,
     code_num = NULL,
-    ICD10_Code_ann = NULL,
+    code_ann = NULL,
     freq = 200,
     totalage_freq = NULL,
-    subgroup = TRUE
+    subgroup = TRUE,
+    group_id = NULL,
+    codeset = 'icd10'
 ) {
+    suppressMessages(library(stringr))
+
     if(length(code_num)>0) {
+        code_num = str_replace_all(code_num, "[^[:alnum:]]", "") # remove all special characters from string
+    }
+
+    if(length(code_num)==1 & codeset=='icd10') {
         master_sub <- master[grep(code_num, master$Disease_Code), ]
-        code_meaning_df2 <- subset(ICD10_Code_ann, ICD10_Code_ann$coding == code_num)
+        code_meaning_df2 <- subset(code_ann, coding == code_num)
         code_meaning2 = code_meaning_df2$meaning
-    } else {
+    } else if(length(code_num)>0 & codeset=='phecode') {
+        n = length(code_num)
+        master_sub_li = lapply(c(1:n), function(i) {
+            subset(master, Disease_Code == code_num[i])
+        })
+        master_sub = data.table::rbindlist(master_sub_li) %>% unique
+        group_sub = subset(code_ann, phecode == group_id)
+        code_meaning2 = paste0(group_id,' ',group_sub$phenotype)
+    } else if(is.null(code_num)) {
         paste0('\n[NOTE] No input code_num -> Counting total code frequency.\n') %>% cat
         code_num = "total"
         totalage_freq = NULL
         subgroup = FALSE
         master_sub = master
         code_meaning2 = "Total Diseases"
+    } else {
+        paste0('\n[ERROR] Input data is something wrong. Please check.\n') %>% cat
+        stop()
     }
     col_nm = c("Age at Diagnosis", "Frequency", "Incidence Rate", "category", "Disease ID")
 
     # Count incidence of subgroups
+    #code_nums = paste0(code_num, collapse=',')
+    #paste0(code_meaning2, ', N = ', nrow(master_sub),' (', code_nums, ')\n') %>% cat
+    if(nrow(master_sub) < freq) return(NULL)
+
     if(subgroup) {
-        subset_name <- master_sub$Disease_Code %>% as.character %>% unique
+        subset_name <- master_sub$Disease_Code %>% 
+            as.character %>% unique
         subset_name = subset_name[!subset_name==code_num] # exclude query code_num
-        
-        if (nrow(master_sub) < freq) return(NULL)
+        if(length(subset_name)>0) {
+            subset_list = lapply(c(1:length(subset_name)), function(i) {
+                master_subset <- master_sub[grep(subset_name[i], master_sub$Disease_Code), ]
+                age_freq <- as.data.frame(table(floor(master_subset$Diagnosed_age)))
+                if(nrow(age_freq)>0) {
+                    colnames(age_freq) <- c("Age at Diagnosis", "Frequency")
+                } else age_freq = NULL
 
-        subset_list = lapply(c(1:length(subset_name)), function(i) {
-            master_subset <- master_sub[grep(subset_name[i], master_sub$Disease_Code), ]
-            age_freq <- as.data.frame(table(floor(master_subset$Diagnosed_age)))
-            if(nrow(age_freq)>0) {
-                colnames(age_freq) <- c("Age at Diagnosis", "Frequency")
-            } else age_freq = NULL
+                if (sum(age_freq$"Frequency") > freq) {
+                    # Add column: Incidence Rate
+                    age_freq$`Incidence Rate` <- age_freq$Frequency/sum(age_freq$Frequency)
 
-            if (sum(age_freq$"Frequency") > freq) {
-                # Add column: Incidence Rate
-                age_freq$`Incidence Rate` <- age_freq$Frequency/sum(age_freq$Frequency)
-
-                # Add columns: category, Disease ID
-                code_meaning_df = subset(master_subset, Disease_Code==subset_name[i])
-                code_meaning = code_meaning_df$meaning %>% as.character %>% unique
-                code_meaning = code_meaning[1]
-                if(length(code_meaning)==0) code_meaning = subset_name[i]
-                age_freq = data.frame(age_freq,
-                    category=paste0(code_meaning, " (n=",nrow(master_subset), ")"),
-                    `Disease ID`=subset_name[i])
-            } else age_freq = NULL
-            return(age_freq)
-        })
-        subset_li = subset_list[!sapply(subset_list,is.null)]
-        if(length(subset_li)>0) {
-            subgroups_df <- data.table::rbindlist(subset_li)
-            colnames(subgroups_df) = col_nm
-            subgroups_df$`Age at Diagnosis` <- as.character(subgroups_df$`Age at Diagnosis`) %>% as.numeric
-            subgroups_df$category <- as.factor(subgroups_df$category)
-        } else return(NULL)
+                    # Add columns: category, Disease ID
+                    code_meaning_df = subset(master_subset, Disease_Code==subset_name[i])
+                    code_meaning = code_meaning_df$meaning %>% as.character %>% unique
+                    code_meaning = code_meaning[1]
+                    if(length(code_meaning)==0) code_meaning = subset_name[i]
+                    age_freq = data.frame(age_freq,
+                        category=paste0(code_meaning, " (n=",nrow(master_subset), ")"),
+                        `Disease ID`=subset_name[i])
+                } else age_freq = NULL
+                return(age_freq)
+            })
+            subset_li = subset_list[!sapply(subset_list,is.null)]
+            if(length(subset_li)>0) {
+                subgroups_df <- data.table::rbindlist(subset_li)
+                colnames(subgroups_df) = col_nm
+                subgroups_df$`Age at Diagnosis` <- as.character(subgroups_df$`Age at Diagnosis`) %>% as.numeric
+                subgroups_df$category <- as.factor(subgroups_df$category)
+            } else return(NULL)
+        } else subgroups_df = NULL
     } else subgroups_df = NULL
     
     # Count incidence of code_num (total)
@@ -74,9 +97,13 @@ original <- function(
     if(m>0) {
         colnames(age_freq) <- c("Age at Diagnosis", "Frequency")
         age_freq$`Incidence Rate` <- age_freq$Frequency/sum(age_freq$Frequency)
-        age_freq = data.frame(age_freq,
+        if(is.null(group_id)) {
+            dis_name = code_num
+        } else dis_name = group_id
+        age_freq = data.frame(
+            age_freq,
             category = paste0(code_meaning2, " (n=", nrow(master_sub), ")"),
-            `Disease ID` = code_num
+            `Disease ID` = dis_name
         )
         colnames(age_freq) = col_nm
         age_freq$`Age at Diagnosis` <- as.character(age_freq$`Age at Diagnosis`) %>% as.numeric
@@ -96,25 +123,70 @@ original <- function(
 }
 
 
+original_phecode = function(
+    master = NULL,
+    code_num = NULL,
+    code_ann = NULL,
+    freq = 200,
+    totalage_freq = NULL
+) {
+    paste0('\n** Run original_phecode **\n\n') %>% cat
+
+    # Convert a phecode to icd9/10
+    code_ann_sub = code_ann[grep(code_num, code_ann$phecode),]
+    code_num_li = lapply(c(1:nrow(code_ann_sub)),function(i) {
+        row = code_ann_sub[i,]
+        code_row = c(row$icd9_ukb, row$icd10_ukb)
+        res = strsplit(code_row,'\\, ') %>% 
+            unlist %>% unique
+        res[!is.na(res)]
+    })
+    names(code_num_li) = code_ann_sub$phecode
+    paste0('Processing ',length(code_num_li),' iterations:\n') %>% cat
+
+    ori_res_li = lapply(c(1:length(code_num_li)),function(i) {
+        code_num_icds = code_num_li[[i]]
+        group_id = names(code_num_li[i])
+        res_df = original(
+            master,
+            code_num      = code_num_icds,
+            code_ann      = code_ann,
+            freq          = freq,
+            totalage_freq = totalage_freq,
+            subgroup      = FALSE,
+            group_id      = group_id,
+            codeset       = 'phecode'
+        )[[1]]
+    })
+    ori_res_df = data.table::rbindlist(ori_res_li) %>% unique
+
+    return(list(ori_res_df,code_num,"original"))
+}
+
+
 ##Function that normalize the incidence rate based on total age incidence rate
 normalized <- function(
     master = NULL,
     code_num = NULL,
-    ICD10_Code_ann = NULL,
+    code_ann = NULL,
     freq = 200,
     totalage_freq = NULL,
-    subgroup = TRUE
+    subgroup = TRUE,
+    group_id = NULL,
+    codeset  = 'icd10'
 ) {
-    result <- master[grep(code_num, master$Disease_Code), ]
-    if (nrow(result) < freq) return(NULL)
+    #result <- master[grep(code_num, master$Disease_Code), ]
+    #if (nrow(result) < freq) return(NULL)
   
     #normalizeddf <- merge(x = original_ICD9(code_num)[[1]], y = totalage_freq, by = "Age at Diagnosis", all = TRUE)
     original_res = original(
         master,
-        code_num,
-        ICD10_Code_ann,
+        code_num = code_num,
+        code_ann = code_ann,
         totalage_freq = totalage_freq,
-        subgroup = subgroup)[[1]]
+        subgroup = subgroup,
+        group_id = group_id,
+        codeset  = codeset)[[1]]
     if(!is.null(original_res)) {
         normalized_merge <- merge(
             x = original_res,
@@ -132,6 +204,56 @@ normalized <- function(
 }
 
 
+normalized_phecode = function(
+    master = NULL,
+    code_num = NULL,
+    code_ann = NULL,
+    freq = 200,
+    totalage_freq = NULL,
+    subgroup = TRUE
+) {
+    # Convert a phecode to icd9/10
+    if(subgroup) {
+        paste0('\n** Run normalized_phecode **\n\n') %>% cat
+        code_ann_sub = code_ann[grep(code_num, code_ann$phecode),]
+        code_num_li = lapply(c(1:nrow(code_ann_sub)),function(i) {
+            row = code_ann_sub[i,]
+            code_row = c(row$icd9_ukb, row$icd10_ukb)
+            res = strsplit(code_row,'\\, ') %>% 
+                unlist %>% unique
+            res[!is.na(res)]
+        })
+        names(code_num_li) = code_ann_sub$phecode
+        paste0('Processing ',length(code_num_li),' iterations:\n') %>% cat
+    } else {
+        code_ann_sub = subset(code_ann, phecode == code_num)
+        code_icds = c(code_ann_sub$icd9_ukb, code_ann_sub$icd10_ukb)
+        res = strsplit(code_icds,'\\, ') %>%
+            unlist %>% unique
+        code_num_li = list(res[!is.na(res)])
+        names(code_num_li) = code_ann_sub$phecode
+    }
+    
+    ori_res_li = lapply(c(1:length(code_num_li)), function(i) {
+        code_num_icds = code_num_li[[i]]
+        group_id = names(code_num_li[i])
+        res_df = normalized(
+            master,
+            code_num      = code_num_icds,
+            code_ann      = code_ann,
+            freq          = freq,
+            totalage_freq = totalage_freq,
+            subgroup      = FALSE,
+            group_id      = group_id,
+            codeset       = 'phecode'
+        )[[1]]
+    })
+    ori_res_df = data.table::rbindlist(ori_res_li) %>% unique
+
+    return(list(ori_res_df,code_num,"normalized"))
+}
+
+
 multi_normalized = function(
     master = NULL,
     code_num = NULL,
@@ -139,7 +261,7 @@ multi_normalized = function(
     totalage_freq = NULL, 
     subgroup = TRUE
 ) {
-    library(future.apply)
+    suppressMessages(library(future.apply))
 
     #paste0('\n** Run multi_normalized **\n\n') %>% cat
     n = length(code_num); m = 100
@@ -164,11 +286,11 @@ multi_normalized = function(
 normalized_by_cat = function(
     master = NULL,
     cat_code = NULL,
-    ICD10_Code_ann = NULL, 
+    code_ann = NULL, 
     totalage_freq = NULL, 
     subgroup = FALSE
 ) {
-    library(future.apply)
+    suppressMessages(library(future.apply))
     source('src/pdtime.r')
     t0=Sys.time()
 
@@ -182,12 +304,46 @@ normalized_by_cat = function(
 
         m = length(code_num)
         paste0(m,' -> ') %>% cat
-        norm_li = lapply(c(1:m), function(j) {
+        norm_li = future_lapply(c(1:m), function(j) {
             norm_df <- normalized(master, code_num[j],
-                ICD10_Code_ann, 200, totalage_freq, subgroup)[[1]]
+                code_ann, 200, totalage_freq, subgroup)[[1]]
         })
         norm_rbind = data.table::rbindlist(norm_li) %>% unique
-        paste0(dim(norm_rbind),collapse=' ') %>% cat
+        paste0(c('dim ',dim(norm_rbind)),collapse=' ') %>% cat
+        paste0('; ',pdtime(t0,2)) %>% cat
+
+        return(list(norm_rbind, categories[i], "normalized"))
+    })
+}
+
+
+normalized_by_cat_phecode = function(
+    master = NULL,
+    cat_code = NULL,
+    code_ann = NULL, 
+    totalage_freq = NULL, 
+    subgroup = FALSE
+) {
+    suppressMessages(library(future.apply))
+    source('src/pdtime.r')
+    t0=Sys.time()
+
+    paste0('\n** Run normalized_by_cat **\n\n') %>% cat
+    categories = cat_code[,1] %>% unique
+    n = length(categories);
+    paste0('Processing ',n,' iterations:\n') %>% cat
+    cat_res_li = future_lapply(c(1:n),function(i) {
+        paste0('  ',i,'/',n,' ',categories[i],' = ') %>% cat
+        code_num = cat_code[which(cat_code[,1] %in% categories[i]),2] %>% unique
+
+        m = length(code_num)
+        paste0(m,' -> ') %>% cat
+        norm_li = lapply(c(1:m), function(j) {
+            norm_df <- normalized_phecode(master, code_num[j],
+                code_ann, 200, totalage_freq, subgroup)[[1]]
+        })
+        norm_rbind = data.table::rbindlist(norm_li) %>% unique
+        paste0(c('dim ',dim(norm_rbind)),collapse=' ') %>% cat
         paste0('; ',pdtime(t0,2)) %>% cat
 
         return(list(norm_rbind, categories[i], "normalized"))
@@ -214,7 +370,7 @@ clustering_preprocess <- function(
     if(nrow(norm_result_df)>0) {
         clust_result = norm_result_df %>%
             select(-category) %>%
-            spread(key=`Disease ID`,value=`Normalized Incidence Rate`) %>%
+            spread(key=`Disease ID`, value=`Normalized Incidence Rate`) %>%
             select(-total)
         paste0(dim(clust_result),' ') %>% cat
     } else {
@@ -229,6 +385,52 @@ clustering_preprocess <- function(
     clust_result[is.na(clust_result)] <- 0
     paste0('-> done\n') %>% cat
     
+    paste0('\n',pdtime(t0,1)) %>% cat
+    return(clust_result)
+}
+
+
+clustering_preprocess_phecode = function(
+    master = NULL,
+    code_num = NULL, 
+    code_ann = NULL,
+    freq = 200,
+    totalage_freq = NULL
+) {
+    suppressMessages(library(future.apply))
+
+    source('src/pdtime.r')
+    t0=Sys.time()
+
+    paste0('\n** Run clustering_preprocess_phecode **\n\n') %>% cat
+    n = length(code_num); m = 100
+    paste0('Processing ',n,' iterations:\n') %>% cat
+
+    norm_result_li = future_lapply(c(1:n), function(i) {
+        if(i%%m==0) {paste0('  ',i,'/',n,' ',code_num[i],' ',pdtime(t0,2)) %>% cat}
+        normalized_phecode(master, code_num[i],
+            code_ann, freq, totalage_freq, subgroup=FALSE)[[1]]
+    })
+    norm_result_df = data.table::rbindlist(norm_result_li) %>% unique
+
+    paste0('Merging data = ') %>% cat
+    if(nrow(norm_result_df)>0) {
+        clust_result = norm_result_df %>%
+            select(-category) %>%
+            spread(key=`Disease ID`, value=`Incidence Rate`) %>%
+            select(-total)
+        paste0(dim(clust_result),' ') %>% cat
+    } else {
+        dim(norm_result_df) %>% print
+        return(NULL)
+    }
+    row_nms = clust_result$`Age at Diagnosis`
+    clust_result$`Age at Diagnosis` <- NULL
+    clust_result <- as.matrix(clust_result)
+    rownames(clust_result) = row_nms
+    clust_result[is.na(clust_result)] <- 0
+    paste0('-> done\n') %>% cat
+
     paste0('\n',pdtime(t0,1)) %>% cat
     return(clust_result)
 }
@@ -250,9 +452,10 @@ dataplotting <- function(
             color = category,
             group = category
         ), las = 3, size = 5)+
-        geom_smooth(alpha = .15, aes(fill = category))+
-        scale_x_continuous(limits = c(age_min, age_max), n.breaks = 10)+
-        theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+        geom_line(alpha=.3, size=1, aes(fill = category))+
+        geom_smooth(alpha=.15, aes(fill = category))+
+        scale_x_continuous(limits = c(age_min, age_max), n.breaks=10)+
+        theme(axis.text.x = element_text(angle=90, vjust=0.5, hjust=1))+
         labs(y = "Incidence Rate", x = "Age at Diagnosis")+
         theme_bw()+
         theme(legend.position = "right", 
@@ -264,18 +467,18 @@ dataplotting <- function(
         p <- p+aes(y = log(`Incidence Rate`, logbase))+
             labs(y = paste0("log", logbase, "(Incidence Rate)"))
     }
-    print(list_exp[[2]])
     
     f_name = paste0(f_dir,'/',list_exp[[2]], "_", list_exp[[3]], "_", logbase, ".png")
-    ggsave(f_name,p,width=10,height=6,units='in')
+    ggsave(f_name,p,width=8,height=3,units='in')
+    paste0('Draw plot: ',f_name,'\n') %>% cat
 }
 
 
 dataplotting_multi =  function(
-    list_exp = NULL,
-    cut_top = NULL,
+    list_exp   = NULL,
+    cut_top    = NULL,
     cut_bottom = NULL,
-    out = 'fig'
+    out        = 'fig'
 ) {
   
     if (is.null(list_exp)) return(NULL)
@@ -289,27 +492,30 @@ dataplotting_multi =  function(
         tb = subset(list_exp[[1]],`Age at Diagnosis` %in% age_sub)
     } else tb = list_exp[[1]]
 
-    dis_num = 
+    dis_num = list_exp[[1]]$`Disease ID` %>% unique %>% length
     plotdata <- ggplot(data = tb, 
         aes(x = `Age at Diagnosis`,
             y = `Incidence Rate`,
             group = category),
-        las=1, size=3)+
-        geom_line(color="gray40", alpha = .5)+
+        size=1)+
+        geom_line(aes(group=category), color="gray40", alpha = .5)+
         scale_x_continuous(n.breaks = 10)+ #limits = c(age_min, age_max)
         theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
         geom_hline(yintercept=1, linetype="dashed",color="black")+
-        #geom_smooth(method="loess")+
+        stat_summary(aes(color="mean",shape="mean",group=1),
+            fun=mean,color="red",geom="line",size=2)+
         labs(y = "Incidence Rate", x = "Age at Diagnosis")+
+        ggtitle(paste0('Disease = ',dis_num))+
         theme_bw()
   
     print(list_exp[[2]])
   
     f_name = paste0(out,'/',list_exp[[2]],"_",list_exp[[3]],
         "_cut_",cut_top,',',cut_bottom,"_plot.png")
-    png(f_name, width=5,height=4, unit='in', res = 300)
-  
-    plotdata = plotdata + theme(legend.position = "none")
+    png(f_name, width=4,height=3, unit='in', res = 300)
+    
+    plotdata = plotdata + 
+        theme(legend.position = "none")
     print(plotdata)
     dev.off() 
   
