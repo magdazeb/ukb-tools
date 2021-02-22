@@ -28,22 +28,27 @@ original <- function(
     } else if(codeset=='phecode' & length(code_num)>0) {
         # Extract icd9
         n = length(code_num$icd9)
-        if(n>0) {
+        if(n > 0) {
             master_sub_icd9_li = lapply(c(1:n), function(i) {
                 code_num_icd9 = str_replace_all(code_num$icd9[i], "[^[:alnum:]]", "")
                 master_icd9 = subset(master, ICD9.ICD10 == "ICD9")
-                master_icd9 %>% filter(str_detect(Disease_Code, 
+                master_icd9 %>% filter(str_detect(
+                    Disease_Code, 
                     paste0('^', code_num_icd9)))
             })
         } else master_sub_icd9_li = NULL
         master_sub_icd9 = data.table::rbindlist(master_sub_icd9_li) %>% unique
         # Extract icd10
         m = length(code_num$icd10)
-        if(m>0) {
+        if(m > 0) {
             master_sub_icd10_li = lapply(c(1:m), function(j) {
                 code_num_icd10 = str_replace_all(code_num$icd10[j], "[^[:alnum:]]", "")
                 master_icd10 = subset(master, ICD9.ICD10 == "ICD10")
-                master_icd10[grep(code_num_icd10, master$Disease_Code), ]
+                #res = master_icd10[grep(code_num_icd10, master$Disease_Code), ]
+                master_icd10 %>% filter(str_detect(
+                    Disease_Code,
+                    paste0('^', code_num_icd10)
+                ))
             })
         } else master_sub_icd10_li = NULL
         master_sub_icd10 = data.table::rbindlist(master_sub_icd10_li) %>% unique
@@ -244,7 +249,10 @@ normalized <- function(
         normalized_merge$`Normalized Incidence Rate` = normalized_merge$`Incidence Rate.x`/normalized_merge$`Incidence Rate.y`
         normalized_res <- normalized_merge %>% select(`Age at Diagnosis`,`category`,`Normalized Incidence Rate`,`Disease ID`)
         colnames(normalized_res) <- c("Age at Diagnosis", "category", "Incidence Rate", "Disease ID")
-    } else return(NULL)
+    } else {
+        #paste0('[ERROR] NULL input detected at normlized function!\n') %>% cat
+        return(NULL)
+    }
   
     return(list(normalized_res, original_result[[2]], "normalized"))
 }
@@ -394,25 +402,26 @@ clustering_preprocess <- function(
     paste0('\n** Run clustering_preprocess **\n\n') %>% cat
     n = length(code_num); m = 100
     paste0('Processing ',n,' iterations:\n') %>% cat
-    norm_result <- future_lapply(c(1:n), function(i) {
+    norm_result_li <- future_lapply(c(1:n), function(i) {
         if(i%%m==0) {paste0('  ',i,'/',n,' ',code_num[i],' ',pdtime(t0,2)) %>% cat}
-
+        
         original_result = original(master, code_num[i],
             code_ann, freq, totalage_freq, subgroup=FALSE)
         if(normalized) {
-            norm_df <- normalized(original_result)[[1]]
-        } else norm_df = original_result
-        
-        return(norm_df)
+            normalized(original_result)[[1]]
+        } else return(original_result[[1]])
     })
-    norm_result_df = data.table::rbindlist(norm_result) %>% unique
-    colnames(norm_result_df) = c('Age at Diagnosis','category','Normalized Incidence Rate','Disease ID')
+    norm_result_li[sapply(norm_result_li, is.null)] <- NULL # Remove NULL elements
+    paste0('List = ',length(norm_result_li),' (freq >',freq,') ') %>% cat
 
-    paste0('Merging data = ') %>% cat
+    norm_result_df = data.table::rbindlist(norm_result_li) %>% unique
+    #colnames(norm_result_df) = c('Age at Diagnosis','category','Normalized Incidence Rate','Disease ID')
+
+    paste0('; Merging data = ') %>% cat
     if(nrow(norm_result_df)>0) {
         clust_result = norm_result_df %>%
-            select(-category) %>%
-            spread(key=`Disease ID`, value=`Normalized Incidence Rate`) %>%
+            select(-category,-Frequency) %>%
+            spread(key=`Disease ID`, value=`Incidence Rate`) %>%
             select(-total)
         paste0(dim(clust_result),' ') %>% cat
     } else {
@@ -451,16 +460,14 @@ clustering_preprocess_phecode = function(
 
     norm_result_li = future_lapply(c(1:n), function(i) {
         if(i%%m==0) {paste0('  ',i,'/',n,' ',code_num[i],' ',pdtime(t0,2)) %>% cat}
-        if(normalized) {
-            ori_result = original_phecode(master, code_num[i],
+        ori_result = original_phecode(master, code_num[i],
                 code_ann, freq, totalage_freq, subgroup=FALSE)
+        if(normalized) {
             normalized(ori_result)[[1]]
-        } else {
-            original_phecode(master, code_num[i],
-                code_ann, freq, totalage_freq, subgroup=FALSE)[[1]]
-        }
+        } else return(ori_result)
         
     })
+    norm_result_li[sapply(norm_result_li, is.null)] <- NULL # Remove NULL elements
     norm_result_df = data.table::rbindlist(norm_result_li) %>% unique
 
     paste0('Merging data = ') %>% cat

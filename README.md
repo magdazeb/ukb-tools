@@ -246,17 +246,36 @@ barplot(total_icd10_freq_vec,main='Total ICD-10 incidences',xlab='Age at Diagnos
 dev.off()
 ```
 
-ICD10 codes have 4.1M records with age range 40-80 years old.
+ICD10 codes have 4.1 M records with age range 40-80 years old.
 
-![](fig/total_icd10_freq.png)
+![](fig/icd10/total_icd10_freq.png)
 
-### Examples: Age-related diseases
+### Calculating ICD-9 background incidence
 
-![](fig/ARD.png)
+```R
+source('src/ard.r')
+master6_icd9 = subset(master6,ICD9.ICD10=='ICD9')
+total_icd9_freq = original(
+    master6_icd9, 
+    code_num=NULL, 
+    code_ann=NULL,
+    totalage_freq=NULL, 
+    subgroup=FALSE)[[1]]
+saveRDS(total_icd9_freq,'total_icd9_freq.rds')
 
-This is the plot from UKB self-reported data.
+# Create barplot of total ICD-10 disease incidences
+total_icd9_freq_vec = total_icd9_freq$Frequency
+names(total_icd9_freq_vec) = total_icd9_freq$`Age at Diagnosis`
+png('fig/total_icd9_freq.png')
+barplot(total_icd9_freq_vec, main='Total ICD-9 incidences', xlab='Age at Diagnosis')
+dev.off()
+```
 
-Draw incidence rate plot for major age-related diseases and its subgroups.
+ICD9 codes have 58 K (58,699) records with age range 27-57 years old.
+
+![](fig/total_icd9_freq.png)
+
+### Example: G35 Multiple sclerosis
 
 ```R
 library(dplyr)
@@ -268,6 +287,37 @@ ICD10_Code_ann = read.delim('ICD10_DataCoding_41270.tsv')
 total_icd10_freq = readRDS('total_icd10_freq.rds')
 
 # Calculate incidence rates
+source('src/ard.r')
+dis = c("G35", "E10")
+out_dir = 'fig/icd10'
+
+for(i in 1:length(dis)) {
+    # Prepare data
+    inc_rate = original(master6,dis[i],ICD10_Code_ann,200,total_icd10_freq,TRUE)
+    inc_norm = normalized(inc_rate)
+
+    # Draw plots
+    dataplotting(inc_rate,logbase=10,age_min=40,age_max=80,out_dir)
+    dataplotting(inc_norm,logbase=10,age_min=40,age_max=80,out_dir)
+}
+```
+
+| Disease                                 | Incidence rate                        | Normalized incidence rate               |
+| --------------------------------------- | ------------------------------------- | --------------------------------------- |
+| G35 Multiple sclerosis                  | ![](fig/icd10/G35_original_log10.png) | ![](fig/icd10/G35_normalized_log10.png) |
+| E10 Insulin-dependent diabetes mellitus | ![](fig/icd10/E10_original_log10.png) | ![](fig/icd10/E10_normalized_log10.png) |
+
+
+
+### Examples: Age-related diseases
+
+![](fig/ARD.png)
+
+This is the plot from UKB self-reported data.
+
+Draw incidence rate plot for major age-related diseases and its subgroups.
+
+```R
 source('src/ard.r')
 dis = c("G30", "E11", "E14", "I21", "I22", "I50", "I64", "J44")
 out_dir = 'fig/icd10'
@@ -290,7 +340,7 @@ for(i in 1:length(dis)) {
 | J44 Other chronic obstructive pulmonary disease (COPD)       | ![](fig/icd10/J44_original_log10.png) | ![](fig/icd10/J44_normalized_log10.png) |
 | I21 Acute myocardial infarction (Acute MI)                   | ![](fig/icd10/I21_original_log10.png) | ![](fig/icd10/I21_normalized_log10.png) |
 | I22 Subsequent myocardial infarction (Subsequent MI)         | ![](fig/icd10/I22_original_log10.png) | ![](fig/icd10/I22_normalized_log10.png) |
-| I64 Stroke, not specified as haemorrhage or infarction  1432 | ![](fig/icd10/I64_original_log10.png) | ![](fig/icd10/I64_normalized_log10.png) |
+| I64 Stroke, not specified as haemorrhage or infarction       | ![](fig/icd10/I64_original_log10.png) | ![](fig/icd10/I64_normalized_log10.png) |
 | E11 Non-insulin-dependent diabetes mellitus (Diabetes Type II) | ![](fig/icd10/E11_original_log10.png) | ![](fig/icd10/E11_normalized_log10.png) |
 | E14 Unspecified diabetes mellitus (Unspecified Diabetes)     | ![](fig/icd10/E14_original_log10.png) | ![](fig/icd10/E14_normalized_log10.png) |
 
@@ -309,45 +359,54 @@ master6          = readRDS("Jinhee Code/master_6.rds")
 master6_icd10    = subset(master6,ICD9.ICD10=='ICD10')
 ICD10_Code_ann   = read.delim('ICD10_DataCoding_41270.tsv')
 total_icd10_freq = readRDS('total_icd10_freq.rds')
-
-# Calculate normalized incidence rate of ICD10
 icd10 = master6_icd10$Disease_Code %>% as.character %>% unique %>% sort
 
-# Run clustering_preprocess
+# Calculate incidence rate of ICD10
 ## Minimum incidence criteria: 200
 source('src/ard.r')
-clust_result = clustering_preprocess(
+clust_result_ir = clustering_preprocess(
     master         = master6_icd10,
     code_num       = icd10,
     code_ann       = ICD10_Code_ann,
     totalage_freq  = total_icd10_freq,
-    subgroup       = FALSE)
+    normalized     = FALSE)
 
-saveRDS(clust_result,'clust_result_icd10.rds')
+saveRDS(clust_result_ir,'clust_result_icd10_ir.rds')
 ```
 
-> ** Run clustering_preprocess **
->
 > Processing 11726 iterations:
 >
->
->   100/11726 A392 Job process: 33.9 sec
->
+> head(split)
+>   100/11726 A392 Job process: 33 sec
 >   200/11726 B000 Job process: 1.1 min
->
 > ...
+>   11600/11726 Z851 Job process: 1.1 hr
+>   11700/11726 Z961 Job process: 1.1 hr
+> List = 2089 (freq >200) ; Merging data = 41  2090 -> done
 >
->   11600/11726 Z851 Job process: 1.3 hr
->
->   11700/11726 Z961 Job process: 1.3 hr
->
-> Merging data = 41  2090 -> done
->
-> Job done: 2021-02-13 20:31:55 for 1.3 hr
+> Job done: 2021-02-22 02:07:25 for 1.1 hr
+
+Calculate normalized incidence rate of ICD10
+
+```R
+# Run clustering_preprocess
+## Minimum incidence criteria: 200
+source('src/ard.r')
+clust_result_nir = clustering_preprocess(
+    master         = master6_icd10,
+    code_num       = icd10,
+    code_ann       = ICD10_Code_ann,
+    totalage_freq  = total_icd10_freq,
+    normalized     = TRUE)
+
+saveRDS(clust_result_nir,'clust_result_icd10_nir.rds')
+```
+
+> 
 
 
 
-## 3. Draw heatmap of ICD-10 normalized incidences
+## 3. Data pruning: Draw heatmap of ICD-10 normalized incidences
 
 * [See R color palette](https://kbroman.files.wordpress.com/2014/05/crayons.png)
 * `library(colorspace)` [ref](https://www.r-bloggers.com/2019/01/colorspace-new-tools-for-colors-and-palettes/), [fig](https://i2.wp.com/eeecon.uibk.ac.at/~zeileis/assets/posts/2019-01-14-colorspace/hcl-palettes-1.png?ssl=1)
@@ -413,6 +472,19 @@ graphics.off()
 
 
 ## 4. Extract clustered data & draw cluster plots
+
+Load libraries & data
+
+```R
+library(dplyr)
+library(ComplexHeatmap)
+library(circlize)
+
+master6          = readRDS("Jinhee Code/master_6.rds")
+master6_icd10    = subset(master6,ICD9.ICD10=='ICD10')
+ICD10_Code_ann   = read.delim('ICD10_DataCoding_41270.tsv')
+total_icd10_freq = readRDS('total_icd10_freq.rds')
+```
 
 Split normalized incidence rate data by hclust
 
@@ -549,7 +621,7 @@ Phecode covers 3.4M records (80% of total 4.2M records) with age range 27-80 yea
 
 ![](fig/phecode/total_phecode_freq.png)
 
-### Examples: Age-related diseases
+### Examples: Age-related diseases (ARDs)
 
 Draw incidence rate plot for major age-related diseases and its subgroups.
 
@@ -648,12 +720,41 @@ for(i in 1:length(ards_phecodes)) {
 
 | Disease                                                      | Incidence rate                            | Normalized incidence rate                   |
 | ------------------------------------------------------------ | ----------------------------------------- | ------------------------------------------- |
-| 250.1 Type 1 diabetes                                        | ![](fig/phecode/250.1_original_log10.png) | ![](fig/phecode/250.1_normalized_log10.png) |
 | 250.2 Type 2 diabetes                                        | ![](fig/phecode/250.2_original_log10.png) | ![](fig/phecode/250.2_normalized_log10.png) |
 | 290 Delirium dementia and amnestic and other cognitive disorders | ![](fig/phecode/290_original_log10.png)   | ![](fig/phecode/290_normalized_log10.png)   |
 | 411 Ischemic Heart Disease                                   | ![](fig/phecode/411_original_log10.png)   | ![](fig/phecode/411_normalized_log10.png)   |
 | 428 Congestive heart failure; nonhypertensive                | ![](fig/phecode/428_original_log10.png)   | ![](fig/phecode/428_normalized_log10.png)   |
 | 433 Cerebrovascular disease                                  | ![](fig/phecode/433_original_log10.png)   | ![](fig/phecode/433_normalized_log10.png)   |
+
+
+
+### Examples: non-ARDs
+
+```R
+source('src/ard.r')
+ards_phecodes = c("250.1","335")
+out_dir = 'fig/phecode'
+
+for(i in 2:length(ards_phecodes)) {
+    # Prepare data
+    inc_rate = original_phecode(
+        master6_phecode, 
+        code_num=ards_phecodes[i], 
+        code_ann=phecodes, 
+        freq=200,
+        totalage_freq=total_phecode_freq)
+    inc_norm = normalized(inc_rate)
+    
+    # Draw plots
+    dataplotting(inc_rate,logbase=10,age_min=27,age_max=80,out_dir)
+    dataplotting(inc_norm,logbase=10,age_min=27,age_max=80,out_dir)
+}
+```
+
+| Disease                | Incidence rate                            | Normalized incidence rate                   |
+| ---------------------- | ----------------------------------------- | ------------------------------------------- |
+| 250.1 Type 1 diabetes  | ![](fig/phecode/250.1_original_log10.png) | ![](fig/phecode/250.1_normalized_log10.png) |
+| 335 Multiple sclerosis | ![](fig/phecode/335_original_log10.png)   | ![](fig/phecode/335_normalized_log10.png)   |
 
 
 
@@ -738,7 +839,7 @@ saveRDS(clust_result_phecode,'clust_result_phecode_nir.rds')
 
 
 
-## 3. Draw heatmap of Phecode
+## 3. Data pruning: Draw heatmap of Phecode
 
 ```R
 library(dplyr)
@@ -802,6 +903,19 @@ graphics.off()
 
 
 ## 4. Extract clustered data & draw cluster plots
+
+Load libraries & data
+
+```R
+library(dplyr)
+library(ComplexHeatmap)
+library(circlize)
+
+master6 = readRDS("Jinhee Code/master_6.rds")
+phecodes = read.delim("phecode-ukbb-agg.tsv",stringsAsFactors=F)
+phecodes$phecode = sprintf("%.2f", phecodes$phecode)
+total_phecode_freq = readRDS('total_phecode_freq.rds')
+```
 
 Split normalized incidence rate data by hclust
 
@@ -899,10 +1013,10 @@ ICD10_Code_ann = read.delim('ICD10_DataCoding_41270.tsv')
 source('src/ard.r')
 total_death_freq = original(
     death, 
-    code_num=NULL, 
-    ICD10_Code_ann, 
-    totalage_freq=NULL, 
-    subgroup=FALSE)[[1]]
+    code_num = NULL, 
+    code_ann = ICD10_Code_ann, 
+    totalage_freq = NULL, 
+    subgroup = FALSE)[[1]]
 
 # Save as RDS file
 saveRDS(total_death_freq,'total_death_freq.rds')
@@ -953,10 +1067,29 @@ for(i in 1:length(dis)) {
 | G30 Alzheimer's disease (AD)                                 | ![](fig/death/G30_original_log10.png) | ![](fig/death/G30_normalized_log10.png) |
 | J44 Other chronic obstructive pulmonary disease (COPD)       | ![](fig/death/J44_original_log10.png) | ![](fig/death/J44_normalized_log10.png) |
 | I21 Acute myocardial infarction (Acute MI)                   | ![](fig/death/I21_original_log10.png) | ![](fig/death/I21_normalized_log10.png) |
-| I22 Subsequent myocardial infarction (Subsequent MI)         | ![](fig/death/I22_original_log10.png) | ![](fig/death/I22_normalized_log10.png) |
+| I22 Subsequent myocardial infarction (Subsequent MI)         | <100 records                          | <100 records                            |
 | I64 Stroke, not specified as haemorrhage or infarction       | ![](fig/death/I64_original_log10.png) | ![](fig/death/I64_normalized_log10.png) |
 | E11 Non-insulin-dependent diabetes mellitus (Diabetes Type II) | ![](fig/death/E11_original_log10.png) | ![](fig/death/E11_normalized_log10.png) |
 | E14 Unspecified diabetes mellitus (Unspecified Diabetes)     | ![](fig/death/E14_original_log10.png) | ![](fig/death/E14_normalized_log10.png) |
+
+### Example: non-ARDs
+
+```R
+# Calculate incidence rates
+source('src/ard.r')
+dis = c("G35")
+out_dir = 'fig/death'
+
+for(i in 1:length(dis)) {
+    # Prepare data
+    inc_rate = original(death,dis[i],ICD10_Code_ann,0,total_death_freq,TRUE)
+    inc_norm = normalized(inc_rate)
+
+    # Draw plots
+    dataplotting(inc_rate,logbase=10,age_min=40,age_max=80,out_dir)
+    dataplotting(inc_norm,logbase=10,age_min=40,age_max=80,out_dir)
+}
+```
 
 
 
@@ -972,22 +1105,20 @@ death = readRDS("Jinhee Code/Deathfile.rds")
 colnames(death) = c('eid','Diagnosed_age','Cause_of_death','Disease_Code','meaning')
 ICD10_Code_ann = read.delim('ICD10_DataCoding_41270.tsv')
 total_death_freq = readRDS('total_death_freq.rds')
-
-# Calculate normalized incidence rate of ICD10
 icd10_death = death$Disease_Code %>% as.character %>% unique %>% sort
 
-# Run clustering_preprocess
-## Minimum incidence criteria: 200
+# Calculate incidence rate of ICD10
+## Minimum incidence criteria: 100
 source('src/ard.r')
-clust_result_death = clustering_preprocess(
+clust_result_death_ir = clustering_preprocess(
     master         = death,
     code_num       = icd10_death,
     code_ann       = ICD10_Code_ann,
     freq           = 100,
     totalage_freq  = total_death_freq,
-    subgroup       = FALSE)
+    normalized     = FALSE)
 
-saveRDS(clust_result_death,'clust_result_death.rds')
+saveRDS(clust_result_death_ir,'clust_result_death-ir.rds')
 ```
 
 > ** Run clustering_preprocess **
@@ -995,27 +1126,65 @@ saveRDS(clust_result_death,'clust_result_death.rds')
 > Processing 1694 iterations:
 >   100/1694 C119 Job process: 0.6 sec
 >   200/1694 C509 Job process: 1.2 sec
->   300/1694 C911 Job process: 1.8 sec
->   400/1694 D758 Job process: 2.2 sec
->   500/1694 F329 Job process: 2.6 sec
->   600/1694 G969 Job process: 3 sec
->   700/1694 I600 Job process: 3.5 sec
->   800/1694 J123 Job process: 4.2 sec
->   900/1694 K274 Job process: 4.7 sec
->   1000/1694 K822 Job process: 5.1 sec
->   1100/1694 M628 Job process: 5.5 sec
->   1200/1694 Q676 Job process: 6 sec
->   1300/1694 S127 Job process: 6.4 sec
->   1400/1694 T66 Job process: 6.8 sec
->   1500/1694 W158 Job process: 7.1 sec
->   1600/1694 X73 Job process: 7.5 sec
-> Merging data = 42  70 -> done
+>   300/1694 C911 Job process: 1.6 sec
+>   400/1694 D758 Job process: 2 sec
+>   500/1694 F329 Job process: 2.3 sec
+>   600/1694 G969 Job process: 2.6 sec
+>   700/1694 I600 Job process: 3.1 sec
+>   800/1694 J123 Job process: 3.5 sec
+>   900/1694 K274 Job process: 3.9 sec
+>   1000/1694 K822 Job process: 4.2 sec
+>   1100/1694 M628 Job process: 4.5 sec
+>   1200/1694 Q676 Job process: 4.9 sec
+>   1300/1694 S127 Job process: 5.2 sec
+>   1400/1694 T66 Job process: 5.6 sec
+>   1500/1694 W158 Job process: 6 sec
+>   1600/1694 X73 Job process: 6.3 sec
+> List = 96 (freq >100) ; Merging data = 42  97 -> done
 >
-> Job done: 2021-02-21 09:13:28 for 7.8 sec
+> Job done: 2021-02-21 21:57:28 for 6.6 sec
 
+Calculating normalized incidence rate of ICD10
 
+```R
+# Run clustering_preprocess
+## Minimum incidence criteria: 100
+source('src/ard.r')
+clust_result_death_nir = clustering_preprocess(
+    master         = death,
+    code_num       = icd10_death,
+    code_ann       = ICD10_Code_ann,
+    freq           = 100,
+    totalage_freq  = total_death_freq,
+    normalized     = TRUE)
 
-## 3. Draw heatmap of Death
+saveRDS(clust_result_death_nir,'clust_result_death-nir.rds')
+```
+
+> ** Run clustering_preprocess **
+>
+> Processing 1694 iterations:
+>   100/1694 C119 Job process: 0.6 sec
+>   200/1694 C509 Job process: 1.1 sec
+>   300/1694 C911 Job process: 1.7 sec
+>   400/1694 D758 Job process: 2.1 sec
+>   500/1694 F329 Job process: 2.4 sec
+>   600/1694 G969 Job process: 2.8 sec
+>   700/1694 I600 Job process: 3.3 sec
+>   800/1694 J123 Job process: 3.7 sec
+>   900/1694 K274 Job process: 4.2 sec
+>   1000/1694 K822 Job process: 4.6 sec
+>   1100/1694 M628 Job process: 5 sec
+>   1200/1694 Q676 Job process: 5.4 sec
+>   1300/1694 S127 Job process: 5.7 sec
+>   1400/1694 T66 Job process: 6 sec
+>   1500/1694 W158 Job process: 6.3 sec
+>   1600/1694 X73 Job process: 6.7 sec
+> List = 96 (freq >100) ; Merging data = 42  97 -> done
+>
+> Job done: 2021-02-21 21:51:04 for 7.1 sec
+
+## 3. Data pruning: Draw heatmap of Death
 
 ```R
 library(dplyr)
@@ -1023,34 +1192,56 @@ library(ComplexHeatmap)
 library(circlize)
 
 # Read data
-clust_result_death = readRDS('clust_result_death.rds')
+clust_result_death_nir = readRDS('clust_result_death.rds')
+ICD10_Code_ann = read.delim('ICD10_DataCoding_41270.tsv')
 
 # Prepare sub-sets
-## clust_result_death:  42 96; original data
-## clust_result_death2: 42 35; peak age over 60
-## clust_result_death3: 37 27; peak age over 60 & remove top 1 and bottom 2 rows (< 200 death)
+## clust_result_death_ir:   42 96: incidence rate
+## clust_result_death_ir3:  40 27: incidence rate
+
+## clust_result_death_nir:  42 96; normalized incidence rate
+## clust_result_death_nir2: 42 35; peak age over 60
+## clust_result_death_nir3: 40 27; peak age over 60 & remove top 1 and bottom 2 rows (< 200 death)
 source('src/ard.r')
-clust_result_death2 = subsetting_cluster_result(clust_result_death, 0,0, 60)
-clust_result_death3 = subsetting_cluster_result(clust_result_death, 0,2, 60)
+clust_result_death_nir2 = subsetting_cluster_result(clust_result_death_nir, 0,0, 60)
+clust_result_death_nir3 = subsetting_cluster_result(clust_result_death_nir, 0,2, 60)
 col_fun = colorRamp2(c(0,1,2,3,4,7,10), c("white","Sky Blue","yellow Green","yellow","red","purple","black"))
+
+# Extract pruned list from IR data
+col_nms = colnames(clust_result_death_ir)
+select_cols3 = colnames(clust_result_death_nir3)
+clust_result_death_ir3 = clust_result_death_ir[, col_nms[col_nms %in% select_cols3]]
+col_fun2 = colorRamp2(c(min(clust_result_death_ir3),max(clust_result_death_ir3)), c("white","royalblue"))
+
+# Prepare disease name annotations
+select_cols = colnames(clust_result_death_nir)
+dis_names = subset(ICD10_Code_ann, coding %in% select_cols) %>%
+	select(coding, meaning)
+dis_names = dis_names[match(select_cols, dis_names$coding), ]
+dis_ha = dis_names$meaning
+#names(dis_ha) = dis_names$coding
+ha = HeatmapAnnotation(Name=anno_text(dis_ha))
 ```
 
-Draw total 69 Phecode diseases heatmap
+Draw NIR of total 96 Phecode diseases heatmap
 
 ```R
-png('fig/death/clust_result_death.png', width=20,height=8, units='in', res=150)
-Heatmap(clust_result_death, cluster_rows = FALSE, col = col_fun, column_dend_height=unit(1.5,'in'))
+png('fig/death/clust_result_death_merge.png', width=20,height=18, units='in', res=150)
+
+H1 = Heatmap(clust_result_death_nir, name="Norm.\nIR", cluster_rows = FALSE, col = col_fun, column_dend_height=unit(1.5,'in'))
+H2 = Heatmap(clust_result_death_ir, name="Incidence\nRate", cluster_rows = FALSE, col = col_fun2, column_dend_height=unit(1.5,'in'), bottom_annotation = ha, show_column_names = FALSE)
+draw(H1 %v% H2)
 dev.off()
 ```
 
-![](fig/death/clust_result_death.png)
+![](fig/death/clust_result_death_merge.png)
 
 Draw 35 diseases filtered by peak age after 60 years
 
 ```R
 png('fig/death/clust_result_death-peak60.png',
     	width=10,height=8, units='in', res=150)
-Heatmap(clust_result_death2, cluster_rows = FALSE, col = col_fun, column_dend_height=unit(1.5,'in'))
+Heatmap(clust_result_death2, name="Norm.\nIR", cluster_rows = FALSE, col = col_fun, column_dend_height=unit(1.5,'in'))
 dev.off()
 ```
 
@@ -1067,7 +1258,7 @@ f_name = paste0('fig/death/clust_result_death-peak60_bt2trimed_',col_split[i],'.
 
 # Draw heatmaps
 png(f_name, width=wh[1],height=wh[2], units='in', res=150)
-Heatmap(clust_result_death3, cluster_rows = FALSE, col = col_fun, column_split = col_split[i], column_dend_height=unit(1.5,'in'))
+Heatmap(clust_result_death3, name="Norm.\nIR", cluster_rows = FALSE, col = col_fun, column_split = col_split[i], column_dend_height=unit(1.5,'in'))
 dev.off()
 
 # Kill all graphics objects
@@ -1091,25 +1282,36 @@ death = readRDS("Jinhee Code/Deathfile.rds")
 colnames(death) = c('eid','Diagnosed_age','Cause_of_death','Disease_Code','meaning')
 ICD10_Code_ann = read.delim('ICD10_DataCoding_41270.tsv')
 total_death_freq = readRDS('total_death_freq.rds')
+
+# Prepare disease name annotations
+select_cols3 = colnames(clust_result_death_nir3)
+dis_names3 = subset(ICD10_Code_ann, coding %in% select_cols3) %>%
+	select(coding, meaning)
+dis_names3 = dis_names3[match(select_cols3, dis_names3$coding), ]
+dis_ha3 = dis_names3$meaning
+ha3 = HeatmapAnnotation(Name=anno_text(dis_ha3))
 ```
 
 Split normalized incidence rate data by hclust
 
 ```R
 k = 8
-wh = c(9,8)
-f_name = paste0('fig/death/clust_result_death-peak60_bt2trimed_',k,'-re.png')
+wh = c(10,17)
+f_name = paste0('fig/death/clust_result_death-peak60_bt2trimed_',k,'-merge.png')
 code_nm = 'Death'
-split_death = data.frame(cutree(hclust(dist(t(clust_result_death3))), k = k))
+split_death = data.frame(cutree(hclust(dist(t(clust_result_death_nir3))), k = k))
 split_death[,2] = rownames(split_death)
 colnames(split_death) = c('cluster',code_nm)
 
+# Draw heatmap
 png(f_name, width=wh[1],height=wh[2], units='in', res=150)
-Heatmap(clust_result_death3, column_split=split_death[,1], cluster_rows=FALSE, col=col_fun, column_dend_height=unit(1.5,'in'))
+H1 = Heatmap(clust_result_death_nir3, name="Norm.\nIR", column_split=split_death[,1], cluster_rows=FALSE, col=col_fun, column_dend_height=unit(1.5,'in'))
+H2 = Heatmap(clust_result_death_ir3, name="Incidence\nRate", cluster_rows = FALSE, col = col_fun2, column_dend_height=unit(1.5,'in'), bottom_annotation = ha3, show_column_names = FALSE)
+draw(H1 %v% H2)
 dev.off()
 ```
 
-![](fig/death/clust_result_death-peak60_bt2trimed_8-re.png)
+![](fig/death/clust_result_death-peak60_bt2trimed_8-merge.png)
 
 Prepare normalized incidence rate data list by cluster
 
