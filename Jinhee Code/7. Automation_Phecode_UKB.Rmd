@@ -9,11 +9,12 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+##Read the file that is going to be the base data
 ```{r}
 phecode_ukb <- readr::read_tsv('phecode-ukbb-agg.tsv')
 phecode_ukb$phecode <- sprintf("%.2f", phecode_ukb$phecode)
 ```
-
+##Dataplotting for normalized_phecode
 ```{r}
 source("Automated_functioncode.R")
 
@@ -22,25 +23,131 @@ for (i in (1:length(phecode_ukb$phecode))) {
 }
 ```
 
+##preprocess_clustering is the result of function "clustering_preprocess" and this part is omitted in the chunk
+##Make preprocess_clustering_60cut 
 ```{r}
 source("Automated_functioncode.R")
 
-clust_result_2 <- subsetting_cluster_result(preprocess_clustering, 60)
+preprocess_clustering_60cut <- subsetting_cluster_result(preprocess_clustering, 60)
 ```
 
+##Drawing ComplexHeatmap using preprocess_clustering and preprocess_clustering_60cut
 ```{r}
 library("ComplexHeatmap")
 
 library(circlize)
 col_fun = colorRamp2(c(0, 1, 2, 4), c("white", "green", "yellow", "red"))
 
-Heatmap(clust_result, cluster_rows = FALSE, col = col_fun)
-Heatmap(clust_result_1, cluster_rows = FALSE, col = col_fun,
+Heatmap(preprocess_clustering, cluster_rows = FALSE, col = col_fun,
         column_split = 8)
-Heatmap(clust_result_2, cluster_rows = FALSE, col = col_fun,
+Heatmap(preprocess_clustering_60cut, cluster_rows = FALSE, col = col_fun,
         column_split = 8)
 ```
+##SOM drawing (2 ways)
+```{r}
+library(kohonen)
 
+allres <- som(t(preprocess_clustering), grid = somgrid(5, 5))
+plot(allres)
+
+# reverse color ramp
+colors <- function(n, alpha = 1) {
+    rev(heat.colors(n, alpha))
+}
+
+plot(allres, type = "counts", palette.name = colors, heatkey = TRUE)
+
+som_grid <- somgrid(xdim = 5, ydim=5, topo="hexagonal")
+
+som_model <- som(t(preprocess_clustering), 
+    grid=som_grid, 
+    rlen=500, 
+    alpha=c(0.05,0.01), 
+    keep.data = TRUE)
+
+coolBlueHotRed <- function(n, alpha = 1) {
+  rainbow(n, end=4/6, alpha=alpha)[n:1]
+  }
+
+pretty_palette <- c("#1f77b4","#ff7f0e","#2ca02c",
+                    "#d62728","#9467bd","#8c564b","#e377c2")
+
+plot(som_model, type = "property", property = getCodes(som_model)[,4], main=colnames(getCodes(som_model))[4], palette.name=coolBlueHotRed)
+```
+
+##Print out clusters by SOM
+```{r}
+cluster_som <- as.data.frame(allres$unit.classif)
+
+cluster_som[,2] <- colnames(preprocess_clustering)
+colnames(cluster_som) <- c("cluster", "phecode")
+
+a <- lapply(c(1:25), function(i) {
+  subset(cluster_som, cluster == i)
+  })
+
+split_cluster_som = list()
+for (i in 1:length(a)) {
+  split_cluster_som[[i]] <- merge(a[[i]],
+                              as.data.frame(phecode_ukb[,1:4]), 
+                              by = "phecode")
+}
+
+split_cluster_somdf <- data.table::rbindlist(split_cluster_som)
+
+Heatmap(preprocess_clustering, name = "preprocess_clustering", 
+        column_split = cluster_som[,1],
+        cluster_rows = FALSE, col = col_fun)
+```
+
+##SOM clustering by 60 cut (2 ways)
+```{r}
+allres_60cut <- som(t(preprocess_clustering_60cut), 
+                    grid = somgrid(5, 5))
+plot(allres_60cut)
+
+plot(allres_60cut, type = "counts", 
+     palette.name = colors, heatkey = TRUE)
+
+som_model_60cut <- som(t(preprocess_clustering_60cut), 
+    grid=som_grid, 
+    rlen=500, 
+    alpha=c(0.05,0.01), 
+    keep.data = TRUE)
+
+plot(som_model_60cut, type = "property", 
+     property = getCodes(som_model_60cut)[,4],
+     main=colnames(getCodes(som_model_60cut))[4],
+     palette.name=coolBlueHotRed)
+```
+
+##Print out clusters of 60 cut by SOM
+```{r}
+cluster_som_60cut <- as.data.frame(allres_60cut$unit.classif)
+
+cluster_som_60cut[,2] <- colnames(preprocess_clustering_60cut)
+colnames(cluster_som_60cut) <- c("cluster", "phecode")
+
+a1 <- lapply(c(1:25), function(i) {
+  subset(cluster_som_60cut, cluster == i)
+  })
+
+split_cluster_som_60cut = list()
+for (i in 1:length(a)) {
+  split_cluster_som_60cut[[i]] <- merge(a1[[i]],
+                              as.data.frame(phecode_ukb[,1:4]), 
+                              by = "phecode")
+}
+
+split_cluster_som_60cutdf <- data.table::rbindlist(split_cluster_som_60cut)
+
+Heatmap(preprocess_clustering_60cut, 
+        name = "preprocess_clustering_60cut", 
+        column_split = cluster_som_60cut[,1],
+        cluster_rows = FALSE, col = col_fun)
+```
+
+##Print out clusters using hclust and cutree and draw heatmap accordingly
 ```{r}
 split = data.frame(cutree(hclust(dist(t(clust_result_2))), k = 8))
 
@@ -65,6 +172,7 @@ Heatmap(clust_result_2, name = "clust_result_2",
         cluster_rows = FALSE, col = col_fun)
 ```
 
+##Drawing dataplotting_multiple by clusters
 ```{r}
 source("Automated_functioncode.R")
 
@@ -81,6 +189,7 @@ for (i in 1:length(phecode_cluster)) {
 }
 ```
 
+##Drawing phecode by categories
 ```{r}
 unique_category <- unique(phecode_ukb$category)
 
