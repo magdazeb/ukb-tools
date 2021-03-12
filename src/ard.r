@@ -589,38 +589,64 @@ draw_hm = function(
 
 
 original_person = function(
-  master = NULL,
-  code_num = NULL,
-  code_ann = NULL,
-  freq = 200
+    master = NULL,
+    code_num = NULL,
+    code_ann = NULL,
+    freq = 200
 ) {
   suppressMessages(library(stringr))
+  suppressMessages(library(future.apply))
 
-  code_num = str_replace_all(code_num, "[^[:alnum:]]", "") # Remove special characters
-  #master_sub = master[grep(code_num, master$Disease_Code), ]
-  master_sub = master %>%
-    filter(str_detect(
-      Disease_Code, paste0('^', code_num)
-    ))
-  code_ann_sub = subset(code_ann, coding == code_num)
+  if (!is.null(code_num)) {
+    code_num = str_replace_all(code_num, "[^[:alnum:]]", "") # Remove special characters
+    #master_sub = master[grep(code_num, master$Disease_Code), ]
+    master_sub = master %>%
+        filter(str_detect(
+            Disease_Code, paste0('^', code_num)
+        ))
+    code_ann_meaning = subset(code_ann, coding == code_num)$meaning
+  } else {
+    master_sub = master
+    code_ann_meaning = "total disease"
+  }
+
+  # Select patients having multiple records
+  patients_freq = table(master_sub$eid) %>% as.data.frame
+  patients_freq = subset(patients_freq, Freq > 1)
+
+  # Remove earliest record per person
+  patients = patients_freq$Var1 %>% unique
+  n = length(patients)
+  master_p_1_li = future_lapply(c(1:n), function(i) {
+    patient = patients[i]
+    master_p = subset(master_sub, eid == patient)
+    master_p = master_p[order(master_p$Diagnosed_age),]
+    master_p[1,]
+  })
+  master_p_1 = data.table::rbindlist(master_p_1_li)
+  `%notin%` = Negate(`%in%`)
+  master_p_2 = subset(master_sub, eid %notin% patients)
+  master_p = rbind(master_p_1, master_p_2)
 
   # Check freq
-  if (nrow(master_sub) < freq) {
-    paste0('[NOTICE] ', code_num, ' has ', nrow(master_sub), ' record (freq <', freq, ').\n') %>% cat
+  if (nrow(master_p) < freq) {
+    paste0('[NOTICE] ', code_num, ' has ', nrow(master_p), ' record (freq <', freq, ').\n') %>% cat
     return(NULL)
   }
 
-  # Count numbers by age 
-  age_freq = floor(master_sub$Diagnosed_age) %>% table %>% as.data.frame
+  # Count numbers by age
+  age_freq = floor(master_p$Diagnosed_age) %>% table %>% as.data.frame
   m = nrow(age_freq)
   if (m > 0) {
     colnames(age_freq) = c('Age', 'Freq')
   } else return(NULL)
-  age_freq$category = paste0(code_ann_sub$meaning, ' (n=', nrow(master_sub), ')')
+  age_freq$Disease_onset_prop = age_freq$Freq / sum(age_freq$Freq)
+  age_freq$category = paste0(code_ann_meaning, ' (n=', nrow(master_p), ')')
   age_freq$`Disease ID` = code_num
 
-  return(list(age_freq, code_num, "Disease freq"))
+  return(list(age_freq, code_num, "Disease onset prop"))
 }
+
 
 plot_person <- function(
     list_exp = NULL,
@@ -633,34 +659,74 @@ plot_person <- function(
   if (is.null(list_exp)) return(NULL)
 
   #dis_total = list_exp[[1]] %>% filter(`Disease ID` == "total")
-  dis = list_exp[[1]] %>% filter(`Disease ID` != "total")
+  dis = list_exp[[1]]
+  dis$Age = as.character(dis$Age) %>% as.numeric
   ylab_nm = list_exp[[3]]
 
   p = ggplot(data = dis, aes(
-            x = Age,
-            y = Freq
-        ), las = 3, size = 1) +
+        x = Age,
+        y = Disease_onset_prop
+    ), las = 3, size = 1) +
     geom_line(aes(
-      color = category,
-      group = category
+        color = category,
+        group = category
     ), alpha = .3, size = 1) +
     geom_smooth(aes(
-      color = category,
-      fill = category,
-      group = category
+        color = category,
+        fill = category,
+        group = category
     ), alpha = .15) +
-  #scale_x_continuous(limits = c(age_min, age_max), n.breaks = 10) +
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
-        labs(y = ylab_nm, x = "Age-of-onset") +
-        theme_bw() +
-        theme(legend.position = "right",
-            legend.direction = "vertical",
-            legend.background = element_rect(color = "steelblue", linetype = "solid"),
-            legend.text = element_text(size = 8))
+    scale_x_continuous(limits = c(age_min, age_max), n.breaks = 10) +
+    geom_vline(xintercept = 40, linetype = "dotted", color = "grey") +
+    geom_vline(xintercept = 60, linetype = "dotted", color = "black") +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
+    labs(y = ylab_nm, x = "Age-of-onset") +
+    theme_bw() +
+    theme(legend.position = "right",
+        legend.direction = "vertical",
+        legend.background = element_rect(color = "steelblue", linetype = "solid"),
+        legend.text = element_text(size = 8))
 
   f_name = paste0(out_dir, '/', list_exp[[2]], "_",
-      list_exp[[3]], ".png")
+        list_exp[[3]], ".png")
   ggsave(f_name, p, width = 8, height = 3, units = 'in')
+  paste0('Draw plot: ', f_name, '\n') %>% cat
+}
+
+
+plot_gbd = function(
+    gbd_data = NULL,
+    ylab_nm = NULL,
+    out_dir = NULL
+) {
+  suppressMessages(library(ggplot2))
+  if (is.null(gbd_data)) return(NULL)
+  age_order = c("1 to 4", "5 to 9", "10 to 14", "15 to 19", "20 to 24", "25 to 29", "30 to 34", "35 to 39", "40 to 44", "45 to 49", "50 to 54", "55 to 59", "60 to 64", "65 to 69", "70 to 74", "75 to 79", "85 to 89", "90 to 94")
+  gbd_data$age_name = factor(gbd_data$age_name, levels = age_order)
+
+  p = ggplot(data = gbd_data, aes(
+      x = age_name, y = val
+    ), las = 3, size = 1) +
+    geom_line(aes(
+        color = cause_name,
+        group = cause_name
+    ), alpha = .3, size = 1) +
+    geom_smooth(aes(
+        color = cause_name,
+        fill = cause_name,
+        group = cause_name
+    ), alpha = .15) +
+    labs(y = ylab_nm, x = "Age range") +
+    theme_bw() +
+    theme(
+        axis.text.x = element_text(angle = 45, vjust = .5, hjust = .5),
+        legend.position = "right",
+        legend.direction = "vertical",
+        legend.background = element_rect(color = "steelblue", linetype = "solid"),
+        legend.text = element_text(size = 8))
+
+  f_name = paste0(out_dir, '/gbd_', ylab_nm, '.png')
+  ggsave(f_name, p, width = 8, height = 3.5, units = 'in')
   paste0('Draw plot: ', f_name, '\n') %>% cat
 }
 
