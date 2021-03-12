@@ -88,6 +88,14 @@ hist(dis_9_freq_200$Freq, main="ICD-9 disease records (>200)", breaks=20, xlab="
 dev.off()
 ```
 
+| fig/hist_icd10_dis.png      | fig/hist_icd10_dis_200.png      |
+| --------------------------- | ------------------------------- |
+| ![](fig/hist_icd10_dis.png) | ![](fig/hist_icd10_dis_200.png) |
+| fig/hist_icd9_dis.png       | fig/hist_icd9_dis_200.png       |
+| ![](fig/hist_icd9_dis.png)  | ![](fig/hist_icd9_dis_200.png)  |
+
+
+
 Filter diseases only have >200 records
 
 ```R
@@ -151,6 +159,10 @@ hist(master7_icd9_rec$Recruited_age, main="ICD-9 disease person level", xlab="Ag
 dev.off()
 ```
 
+| fig/hist_icd_10_person.png      | fig/hist_icd_9_person.png      |
+| ------------------------------- | ------------------------------ |
+| ![](fig/hist_icd_10_person.png) | ![](fig/hist_icd_9_person.png) |
+
 
 
 # Total disease: person count
@@ -158,6 +170,7 @@ dev.off()
 * This is a distribution of very first disease record from any diseases
 
 ```R
+# Not finished this step
 source('src/pdtime.r')
 t0 = Sys.time()
 
@@ -175,6 +188,7 @@ pdtime(t0,1) %>% cat
 * This is a distribution of first disease record for every diseases
 
 ```R
+# Not finished this step
 # Get disease list in ICD-10
 icd10_codes = master7_icd10_200$Disease_Code %>% unique %>% sort
 
@@ -225,8 +239,12 @@ icd10_ard = list(icd10_ard_freq, "ARDs", "Disease onset prop")
 plot_person(icd10_ard, age_min=40, age_max=80, out_dir)
 ```
 
+![](fig/icd10_person/ARDs_Disease onset prop.png)
+
+
 
 Non-ARD examples:
+
 * G35 Multiple sclerosis
 * E10 Insulin-dependent diabetes mellitus
 
@@ -247,8 +265,11 @@ icd10_nonard = list(icd10_nonard_freq, "Non-ARDs", "Disease onset prop")
 plot_person(icd10_nonard, age_min=40, age_max=80, out_dir)
 ```
 
+![](fig/icd10_person/Non-ARDs_Disease onset prop.png)
 
-The Global Burden of Disease (GBD) data display
+
+
+# The Global Burden of Disease (GBD) data display
 
 ```R
 library(dplyr)
@@ -287,6 +308,10 @@ Alzheimer's disease and other dementias                 Cardiovascular diseases
                                    4500                                    4860
 ```
 
+
+
+## Incidence % profile
+
 Filter and display the data
 
 ```R
@@ -304,6 +329,16 @@ source('src/ard.r')
 plot_gbd(gbd_inci_perc_2019_nonard, ylab_nm="Incidence percent of non-ARDs", out_dir="db_gbd")
 ```
 
+| db_gbd/gbd_Incidence percent of ARDs.png          |
+| ------------------------------------------------- |
+| ![](db_gbd/gbd_Incidence percent of ARDs.png)     |
+| db_gbd/gbd_Incidence percent of non-ARDs.png      |
+| ![](db_gbd/gbd_Incidence percent of non-ARDs.png) |
+
+
+
+## Prevalence % profile
+
 ```R
 gbd_prev_perc_2019_ard = subset(gbd, sex_name=='Both'& measure_name=='Prevalence' & metric_name=='Percent' & year==2019 & cause_name %in% ards)
 
@@ -315,6 +350,16 @@ gbd_prev_perc_2019_nonard = subset(gbd, sex_name=='Both'& measure_name=='Prevale
 source('src/ard.r')
 plot_gbd(gbd_prev_perc_2019_nonard, ylab_nm="Prevalence percent of non-ARDs", out_dir="db_gbd")
 ```
+
+| db_gbd/gbd_Prevalence percent of ARDs.png          |
+| -------------------------------------------------- |
+| ![](db_gbd/gbd_Prevalence percent of ARDs.png)     |
+| db_gbd/gbd_Prevalence percent of non-ARDs.png      |
+| ![](db_gbd/gbd_Prevalence percent of non-ARDs.png) |
+
+
+
+## Death % profile
 
 ```R
 gbd_deaths_perc_2019_ard = subset(gbd, sex_name=='Both'& measure_name=='Deaths' & metric_name=='Percent' & year==2019 & cause_name %in% ards)
@@ -341,6 +386,16 @@ gbd_measure = gbd %>% select(measure_id,measure_name) %>% unique
 39061          6                              Incidence
 ```
 
+| db_gbd/gbd_Death percent of ARDs.png          |
+| --------------------------------------------- |
+| ![](db_gbd/gbd_Death percent of ARDs.png)     |
+| db_gbd/gbd_Death percent of non-ARDs.png      |
+| ![](db_gbd/gbd_Death percent of non-ARDs.png) |
+
+
+
+## DALYs number profile
+
 ```R
 gbd_dalys_num_2019_ard = subset(gbd, sex_name=='Both'& measure_id==2 & metric_name=='Number' & year==2019 & cause_name %in% ards)
 
@@ -352,3 +407,10 @@ gbd_dalys_num_2019_nonard = subset(gbd, sex_name=='Both'& measure_id==2 & metric
 source('src/ard.r')
 plot_gbd(gbd_dalys_num_2019_nonard, ylab_nm="DALYs of non-ARDs", out_dir="db_gbd")
 ```
+
+| db_gbd/gbd_DALYs of ARDs.png          |
+| ------------------------------------- |
+| ![](db_gbd/gbd_DALYs of ARDs.png)     |
+| db_gbd/gbd_DALYs of non-ARDs.png      |
+| ![](db_gbd/gbd_DALYs of non-ARDs.png) |
+
