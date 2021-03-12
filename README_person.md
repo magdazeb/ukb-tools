@@ -88,8 +88,9 @@ hist(dis_9_freq_200$Freq, main="ICD-9 disease records (>200)", breaks=20, xlab="
 dev.off()
 ```
 
-| fig/hist_icd10_dis.png      | fig/hist_icd10_dis_200.png      |
+| Total ICD-10 diseases       | ICD-10 diseases >200 records    |
 | --------------------------- | ------------------------------- |
+| fig/hist_icd10_dis.png      | fig/hist_icd10_dis_200.png      |
 | ![](fig/hist_icd10_dis.png) | ![](fig/hist_icd10_dis_200.png) |
 | fig/hist_icd9_dis.png       | fig/hist_icd9_dis_200.png       |
 | ![](fig/hist_icd9_dis.png)  | ![](fig/hist_icd9_dis_200.png)  |
@@ -109,7 +110,8 @@ unique(master7_icd10_200$eid) %>% length
 > [1] 407519
 
 
-Prepare distribution of age at recruitment
+
+## Prepare distribution of age at recruitment
 
 ```R
 recruite = read.delim('fid21022_age_at_recruitement.tsv')
