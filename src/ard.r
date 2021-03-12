@@ -588,10 +588,30 @@ draw_hm = function(
 }
 
 
+subset_master = function(
+    master = NULL,
+    code_num = NULL,
+    freq = 200
+) {
+  n = length(code_num)
+  paste0('\n',n,' codes were input. Extracting ') %>% cat
+
+  master_sub_li = future_lapply(c(1:n),function(i) {
+    master %>% filter(str_detect(Disease_Code, paste0('^', code_num[i]) ))
+  })
+  master_sub = data.table::rbindlist(master_sub_li) %>% unique
+  dim(master_sub) %>% print
+
+  if(nrow(master_sub)<freq) return(NULL)
+  return(master_sub)
+}
+
+
 original_person = function(
     master = NULL,
     code_num = NULL,
     code_ann = NULL,
+    group_nm = 'No input code group name',
     freq = 200
 ) {
   suppressMessages(library(stringr))
@@ -600,14 +620,14 @@ original_person = function(
   if (!is.null(code_num)) {
     code_num = str_replace_all(code_num, "[^[:alnum:]]", "") # Remove special characters
     #master_sub = master[grep(code_num, master$Disease_Code), ]
-    master_sub = master %>%
-        filter(str_detect(
-            Disease_Code, paste0('^', code_num)
-        ))
-    code_ann_meaning = subset(code_ann, coding == code_num)$meaning
+    master_sub = subset_master(master,code_num,freq=200)
+    if(length(code_num)==1) {
+      code_ann_meaning = subset(code_ann, coding == code_num)$meaning
+    } else code_ann_meaning = group_nm
   } else {
+    # Run total diseases
     master_sub = master
-    code_ann_meaning = "total disease"
+    code_ann_meaning = "total diseases"
   }
 
   # Select patients having multiple records
@@ -642,7 +662,9 @@ original_person = function(
   } else return(NULL)
   age_freq$Disease_onset_prop = age_freq$Freq / sum(age_freq$Freq)
   age_freq$category = paste0(code_ann_meaning, ' (n=', nrow(master_p), ')')
-  age_freq$`Disease ID` = code_num
+  if(length(code_num)==1) {
+    age_freq$`Disease ID` = code_num
+  } else age_freq$`Disease ID` = group_nm
 
   return(list(age_freq, code_num, "Disease onset prop"))
 }

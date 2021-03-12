@@ -1,17 +1,17 @@
-# Summary of Master 6
+# Summary of master 7
+
+Using Master 7 data
 
 ```r
 library(dplyr)
 master7 = readRDS('master_7.rds')
 ICD10_Code_ann = read.delim('ICD10_DataCoding_41270.tsv')
 dim(master7)
-```
-> [1] 4234599      10
-
-```r
 head(master7)
 ```
 ```
+[1] 4234599      10
+
       eid Disease_Code ICD9.ICD10 Disease_Date   content   birthday
 1 1000010         Z800      ICD10   2001-06-21 Secondary 1941-07-01
 2 1000010         N359      ICD10   1999-05-04      Main 1941-07-01
@@ -94,8 +94,8 @@ Filter diseases only have >200 records
 master7_icd9_200 = subset(master7_icd9, Disease_Code %in% dis_9_freq_200$Var1)
 master7_icd10_200 = subset(master7_icd10, Disease_Code %in% dis_10_freq_200$Var1)
 
-unique(master6_icd9_200$eid) %>% length
-unique(master6_icd10_200$eid) %>% length
+unique(master7_icd9_200$eid) %>% length
+unique(master7_icd10_200$eid) %>% length
 ```
 > [1] 13064
 > [1] 407519
@@ -152,24 +152,50 @@ dev.off()
 ```
 
 
-Total disease in person level
-* This is a distribution of first disease record
+
+# Total disease: person count
+
+* This is a distribution of very first disease record from any diseases
 
 ```R
-source('src/ard.r')
+source('src/pdtime.r')
 t0 = Sys.time()
 
-source('src/pdtime.r')
+source('src/ard.r')
 out_dir = 'fig/icd10_person'
-icd10_first_onset = original_person(
-	master7_icd10, code_ann=ICD10_Code_ann, code_num=NULL, freq=200)[[1]]
-plot_person(icd10_first_onset, age_min=40, age_max=80, out_dir)
+icd10_very_first = original_person(
+	master7_icd10, code_ann=ICD10_Code_ann, code_num=NULL, freq=200)
+plot_person(icd10_very_first, age_min=40, age_max=80, out_dir)
 
 pdtime(t0,1) %>% cat
 ```
 
 
-Age-of-onset distribution: records and patients
+
+* This is a distribution of first disease record for every diseases
+
+```R
+# Get disease list in ICD-10
+icd10_codes = master7_icd10_200$Disease_Code %>% unique %>% sort
+
+# Run function
+source('src/pdtime.r')
+t0 = Sys.time()
+
+source('src/ard.r')
+out_dir = 'fig/icd10_person'
+icd10_first_onset = original_person(
+	master7_icd10, 
+    code_ann=ICD10_Code_ann, code_num=icd10_codes, 
+    group_nm='Total diseases', freq=200)[[1]]
+#plot_person(icd10_first_onset, age_min=40, age_max=80, out_dir)
+
+pdtime(t0,1) %>% cat
+```
+
+
+
+## Age-of-onset distribution
 
 Age-related disease (ARD) examples:
 * G30 Alzheimer's disease
