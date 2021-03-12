@@ -273,6 +273,8 @@ plot_person(icd10_nonard, age_min=40, age_max=80, out_dir)
 
 # The Global Burden of Disease (GBD) data display
 
+We used GBD data for validation of Age-at-diagnosis profile from the UKB EMR data. 
+
 ```R
 library(dplyr)
 gbd = read.csv('db_gbd/IHME-GBD_2019_DATA-bd315805-1.csv')
