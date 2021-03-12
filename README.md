@@ -275,7 +275,7 @@ ICD9 codes have 58 K (58,699) records with age range 27-57 years old.
 
 ![](fig/total_icd9_freq.png)
 
-### Example: G35 Multiple sclerosis
+### Example: G35 Multiple sclerosis / E10 Type 1 diabetes
 
 ```R
 library(dplyr)
