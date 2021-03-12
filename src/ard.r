@@ -588,7 +588,7 @@ draw_hm = function(
 }
 
 
-subset_master = function(
+subset_master = function( # Need to fix function
     master = NULL,
     code_num = NULL,
     freq = 200
