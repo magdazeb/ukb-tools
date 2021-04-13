@@ -1,0 +1,332 @@
+---
+title: "Script_phenotypes"
+author: "Jinhee Chang"
+date: "3/26/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(data.table)
+library(foreach)
+library(doParallel)
+library(ukbtools)
+library(dplyr)
+library(purrr)
+library(sampling)
+library(moonBook)
+library(R.utils)
+library(pROC)
+library(fmsb)
+library(rsq)
+library(reticulate)
+```
+
+### Covariate 1: Fid 21022 (Age at Recruitment)
+```{r}
+age = read.csv("21022.csv")
+setnames(age, c("X21022.0.0"), c("age"))
+```
+
+### Covariate 2: Fid 31 (Sex)
+```{r}
+sex = read.csv("31.csv")
+setnames(sex, c("X31.0.0"), c("sex"))
+
+Pheno = merge(age[,c("eid","age")], sex[,c("eid","sex")],
+              by = "eid", all.x = T, sort = F)
+```
+
+### Covariate 3: Fid 22000 (Genotype measurement batch (array_type))
+```{r}
+batch = read.csv("22000.csv")
+setnames(batch, c("X22000.0.0"), c("batch"))
+
+batch$array_type = NA
+batch$array_type[!is.na(batch$batch) & batch$batch >= 1 & batch$batch <= 95] = 1
+batch$array_type[!is.na(batch$batch) & batch$batch < 1] = 0
+batch$array_type = as.factor(batch$array_type)
+#length(batch$eid[batch$batch>=1 & batch$batch<=95])
+#length(batch$eid[batch$array_type == 1])
+
+Pheno = merge(Pheno, batch[,c("eid","array_type")],
+            by = "eid", all.x = T, sort = F)
+```
+
+### Covariate 4: Fid 22009 (Genetic principal components (PCA))
+```{r}
+pca = read.csv("22009.csv")
+col1 = paste0("X22009.0.", 1:20)
+col2 = paste0("PC", 1:20)
+setnames(pca, col1, col2)
+
+Pheno = merge(Pheno, pca[,c("eid",col2)],
+              by = "eid", all.x = T, sort = F)
+```
+
+### Covariate 5: Fid 21001 (Body mass index (BMI))
+
+--> filled NA with the next available data for each row
+--> first entry data for each patients were selected
+```{r}
+BMI = read.csv("21001.csv")
+
+cat("BMI_firstcolumn_NA_count = ")
+sum(is.na(BMI$X21001.0.0))
+BMI$X21001.0.0[is.na(BMI$X21001.0.0)] <- BMI$X21001.1.0[is.na(BMI$X21001.0.0)]
+cat("BMI_firstcolumn_NA_count = ")
+sum(is.na(BMI$X21001.0.0))
+BMI$X21001.0.0[is.na(BMI$X21001.0.0)] <- BMI$X21001.2.0[is.na(BMI$X21001.0.0)]
+cat("BMI_firstcolumn_NA_count = ")
+sum(is.na(BMI$X21001.0.0))
+BMI$X21001.0.0[is.na(BMI$X21001.0.0)] <- BMI$X21001.3.0[is.na(BMI$X21001.0.0)]
+cat("BMI_firstcolumn_NA_count = ")
+sum(is.na(BMI$X21001.0.0))
+cat("BMI_allcolumn_NA_count = ")
+sum(rowSums(is.na(BMI)) == 4)
+
+setnames(BMI, c("X21001.0.0"), c("BMI"))
+Pheno = merge(Pheno, BMI[,c("eid","BMI")],
+              by = "eid", all.x = T, sort = F)
+```
+### Exclude 1: Fid 22001 (Genetic sex) - sex mismatch 372 cases
+
+exclude_eid_count = 372
+```{r}
+sex_mismatch=read.csv("22001.csv")
+setnames(sex_mismatch, c("X22001.0.0"), c("genetic_sex"))
+
+Pheno_temp = merge(sex[,c("eid","sex")], sex_mismatch[,c("eid","genetic_sex")],
+                   by = "eid", all.x = T, sort = F)
+
+exclude = Pheno_temp$eid[!is.na(Pheno_temp$genetic_sex) & !is.na(Pheno_temp$sex) & Pheno_temp$sex != Pheno_temp$genetic_sex]
+exclude = exclude[!duplicated(exclude)]
+cat("exclude_eid_count = ")
+length(exclude) #372 mismatch
+```
+### Exclude 2: Fid 22019 (Sex chromosome aneuploidy) - 651 cases
+
+sex_aneuploidy_not_NA_count = 651
+Total_exclude_eid_count = 1023
+Total_exclude_eid_count_nonduplicated = 842
+```{r}
+sex_aneuploidy = read.csv("22019.csv")
+setnames(sex_aneuploidy, c("X22019.0.0"), c("aneuploidy_sex"))
+
+cat("sex_aneuploidy_not_NA_count = ")
+length(sex_aneuploidy$aneuploidy_sex[!is.na(sex_aneuploidy$aneuploidy_sex)]) #651 cases
+
+exclude = c(exclude, sex_aneuploidy$eid[!is.na(sex_aneuploidy$aneuploidy_sex)])
+cat("Total_exclude_eid_count = ")
+length(exclude) #1023 cases
+
+exclude = exclude[!duplicated(exclude)]
+cat("Total_exclude_eid_count_nonduplicated = ")
+length(exclude) #842 cases
+```
+
+### Exclude 3: Fid 22027 (Outliers for heterozygosity or missing rate) - 968 cases
+
+het_missing_not_NA_count = 968
+Total_exclude_eid_count = 1810
+Total_exclude_eid_count_nonduplicated = 1805
+```{r}
+het_missing = read.csv("22027.csv")
+setnames(het_missing, c("X22027.0.0"), c("het_missing"))
+
+cat("het_missing_not_NA_count = ")
+length(het_missing$het_missing[!is.na(het_missing$het_missing)]) #968 cases
+exclude = c(exclude, het_missing$eid[!is.na(het_missing$het_missing)])
+cat("Total_exclude_eid_count = ")
+length(exclude) #1810 cases
+
+exclude = exclude[!duplicated(exclude)]
+cat("Total_exclude_eid_count_nonduplicated = ")
+length(exclude) #1805 cases
+```
+
+### Exclude 4: Fid 22006 (Genetic ethnic grouping) - 92887 cases
+
+non_white_british_count = 92887
+Total_exclude_eid_count = 94692
+Total_exclude_eid_count_nonduplicated = 94328
+```{r}
+white_british = read.csv("22006.csv")
+setnames(white_british, c("X22006.0.0"), c("ethnicity_genetic"))
+
+cat("non_white_british_count = ")
+length(white_british$ethnicity_genetic[is.na(white_british$ethnicity_genetic)]) #92887 cases
+
+non_white_british = white_british$eid[is.na(white_british$ethnicity_genetic)]
+exclude = c(exclude, non_white_british)
+cat("Total_exclude_eid_count = ")
+length(exclude) #94692 cases
+
+exclude = exclude[!duplicated(exclude)]
+cat("Total_exclude_eid_count_nonduplicated = ")
+length(exclude) #94328 cases
+```
+
+### Exclude 4: Fid 22021 (Genetic kinship to other participants) - 977 cases
+```{r}
+precal_kinship = read.csv("22021.csv")
+setnames(precal_kinship, c("X22021.0.0"), c("kinship"))
+
+# #-1: Participant excluded from kinship inference process
+# precal_siblings = precal_kinship$eid[!is.na(precal_kinship$kinship) & precal_kinship$kinship == -1]
+# length(precal_siblings[!duplicated(precal_siblings)]) #977
+# 
+# #0: No kinship found
+# precal_siblings = precal_kinship$eid[!is.na(precal_kinship$kinship) & precal_kinship$kinship == 0]
+# length(precal_siblings[!duplicated(precal_siblings)]) #339572
+# 
+# #1:	At least one relative identified  
+# precal_siblings = precal_kinship$eid[!is.na(precal_kinship$kinship) & precal_kinship$kinship == 1]
+# length(precal_siblings[!duplicated(precal_siblings)]) #147507
+# 
+# #10: Ten or more third-degree relatives identified 
+# precal_siblings = precal_kinship$eid[!is.na(precal_kinship$kinship) & precal_kinship$kinship == 10]
+# length(precal_siblings[!duplicated(precal_siblings)]) #188
+
+exclude = c(exclude, precal_kinship$eid[!is.na(precal_kinship$kinship) & precal_kinship$kinship == -1])
+cat("Total_exclude_eid_count = ")
+length(exclude) #95305 cases
+cat("Total_exclude_eid_count_nonduplicated = ")
+length(exclude[!duplicated(exclude)]) #94330 cases
+
+precal_siblings = precal_kinship$eid[!is.na(precal_kinship$kinship) & (precal_kinship$kinship %in% c(1,10))] #147695 cases
+precal_siblings_multi=precal_kinship$eid[!is.na(precal_kinship$kinship) & (precal_kinship$kinship %in% c(10))] #188 cases
+cat("precal_siblings_count = ")
+length(precal_siblings[!duplicated(precal_siblings)])
+cat("precal_siblings_multi_count = ")
+length(precal_siblings_multi[!duplicated(precal_siblings_multi)])
+
+for (chr in c(1:22, "MT", "X", "Y", "XY")) 
+  {
+  kinship_chr = fread(paste0("ukb32575_rel_chr", chr, "_s488264.dat")) #non overlapped data
+  if (chr == 1) 
+    {
+    kinship = kinship_chr
+  } else 
+    {
+    kinship = rbind(kinship, kinship_chr)
+  }
+}
+
+kinship = kinship[kinship$ID1 %in% precal_siblings & kinship$ID2 %in% precal_siblings,]
+kinship_nodup <- kinship %>% group_by(ID1,ID2) %>%
+  summarize(Count = n())
+kinship_nodup$Count = NULL
+
+ids <- c(kinship_nodup$ID1, kinship_nodup$ID2) 
+
+ids_dup = ids[duplicated(ids)] 
+cat("Total_duplicated_ids_in_kinship = ")
+length(ids_dup) #66562
+
+ids_sin = ids[!duplicated(ids)] 
+cat("Total_nonduplicated_ids_in_kinship = ")
+length(ids_sin) #147652
+not_founded_matched_ones <- setdiff(precal_siblings, ids) #43 cases -> exclude all (we cannot find matched persons in all ukb32575_rel_chr files)
+
+exclude = c(exclude, not_founded_matched_ones)
+exclude = exclude[!duplicated(exclude)]
+cat("Total_exclude_eid_count_nonduplicated = ")
+length(exclude) #94361 cases
+
+kinship_nodup = kinship_nodup[!(kinship_nodup$ID1 %in% exclude) & !(kinship_nodup$ID2 %in% exclude),] #91215 cases
+write.table(kinship_nodup, "kinship_matrix_with_relatedness.txt", col.names = T, row.names = F, quote = F, sep = "\t")
+
+all_kinship = c(kinship_nodup$ID1, kinship_nodup$ID2)
+all_kinship = all_kinship[!duplicated(all_kinship)]
+cat("Total_all_kinship_count_nonduplicated = ")
+length(all_kinship) #127542 cases
+```
+### Exclude 4 - Continued: Compare with pruning result
+
+Total_exclude_eid_count_nonduplicated = 159075
+```{r}
+kinship_end = read.csv("kinship_matrix_with_relatedness_pruning.csv") #data from prune_subjects.py
+
+kinship_exclude = setdiff(all_kinship, kinship_end$remaining_subjects) #64714 cases
+exclude <- c(exclude, kinship_exclude)
+exclude = exclude[!duplicated(exclude)]
+cat("Total_exclude_eid_count_nonduplicated = ")
+length(exclude) #159075 cases
+
+exclude_df = data.frame(exclude_eid = exclude) 
+write.table(exclude_df, "exclude_eid.txt", col.names = F, row.names = F, quote = F, sep = "\t")
+```
+
+### Write Pheno_final (Covariates with and without exclude eids)
+
+--> Total_eid_count_without_exclude = 343411
+--> Total_eid_count_with_exclude = 502486
+```{r}
+Pheno_final = Pheno[!(Pheno$eid %in% exclude_df$exclude_eid),]
+cat("Total_eid_count_without_exclude = ")
+length(Pheno_final$eid) #159075 cases
+
+cat("Total_eid_count_with_exclude = ")
+length(Pheno$eid) #159075 cases
+
+write.table(Pheno, "Covariates_all.txt", col.names = T, row.names = F, quote = F, sep = "\t")
+write.table(Pheno_final, "Covariates_noexclude.txt", col.names = T, row.names = F, quote = F, sep = "\t")
+```
+### Make table which eids in ukb_prune_data is included in covariates eids
+
+TRUE: in covariates 
+FALSE: excluded fromm covariates
+```{r}
+eid_in <- as.data.frame(table(ukb_prune_con$eid %in% Pheno_final$eid))
+setnames(eid_in, c("Freq"), c("ukb_prune_con"))
+
+temp <- as.data.frame(table(ukb_prune_lon$eid %in% Pheno_final$eid))
+setnames(temp, c("Freq"), c("ukb_prune_lon"))
+eid_in = merge(eid_in, temp[,c("Var1", "ukb_prune_lon")],
+            by = "Var1", all.x = T, sort = F)
+
+temp <- as.data.frame(table(ukb_prune_rep$eid %in% Pheno_final$eid))
+setnames(temp, c("Freq"), c("ukb_prune_rep"))
+eid_in = merge(eid_in, temp[,c("Var1", "ukb_prune_rep")],
+            by = "Var1", all.x = T, sort = F)
+
+temp <- as.data.frame(table(ukb_rep_lifespan$eid %in% Pheno_final$eid))
+setnames(temp, c("Freq"), c("ukb_rep_lifespan"))
+eid_in = merge(eid_in, temp[,c("Var1", "ukb_rep_lifespan")],
+            by = "Var1", all.x = T, sort = F)
+
+rownames(eid_in) <- eid_in[,1]
+eid_in[,1] <- NULL
+
+# write.table(eid_in, "eid_count_in_covariates.txt", col.names = T, row.names = T, quote = F, sep = "\t")
+```
+
+###Merging final ukb_rep_lifespan (without exclude data) with all other variables from ukb_prune_con, ukb_prune_lon, ukb_prune_rep and pheno variables (covariates)
+```{r}
+ukb_rep_lifespan_final = ukb_rep_lifespan[(ukb_rep_lifespan$eid %in% Pheno_final$eid),]
+
+ukb_rep_lifespan_final = merge(ukb_rep_lifespan_final, ukb_prune_con,
+                               by = "eid", all.x = T, sort = F)
+ukb_rep_lifespan_final = merge(ukb_rep_lifespan_final, ukb_prune_lon,
+                               by = "eid", all.x = T, sort = F)
+ukb_rep_lifespan_final = merge(ukb_rep_lifespan_final, ukb_prune_rep,
+                               by = "eid", all.x = T, sort = F)
+
+ukb_rep_lifespan_final = merge(ukb_rep_lifespan_final, Pheno_final,
+                               by = "eid", all.x = T, sort = F)
+
+write.table(ukb_rep_lifespan_final, "ukb_rep_lifespan_final.txt", col.names = T, row.names = T, quote = F, sep = "\t")
+```
+
+###Make count_NA_by_var.txt that counts non-missing variables by each column in ukb_rep_lifespan_final
+```{r}
+count_NA_by_var <- apply(ukb_rep_lifespan_final, 2, 
+                         function (x) sum(!is.na(x)))
+
+write.table(count_NA_by_var, "count_NA_by_var.txt", col.names = T, row.names = T, quote = F, sep = "\t")
+```
+
