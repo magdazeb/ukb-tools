@@ -78,13 +78,13 @@ Usage examples for ukb_prune:
    ```
 
    * input RDS files
-     * `db_UKB/ukb44928.csv.rds`: ukb phenotype data (downloaded from UKB and converted to RDS file)
-     * `db_UKB/ukb_fid_info.csv.rds`: ukb field ID information file (manually generated)
-     * `db_UKB/ukb_fid_code.csv.rds`: ukb field ID code information file (manually generated)
+     * `db_menopause/ukb44928.csv.rds`: ukb phenotype data (downloaded from UKB and converted to RDS file)
+     * `db_menopause/ukb_fid_info.csv.rds`: ukb field ID information file (manually generated)
+     * `db_menopause/ukb_fid_code.csv.rds`: ukb field ID code information file (manually generated)
    * `-anns Longevity`: Select a fid preset, 8 phenotypes
    * `-expt 1845 2946 40007`: exceptionally fids
-     * 1845: Mother's age, values are keep increasing because of their alive, Just select latest data
-     * 2946: Father's age, values are keep increasing because of their alive, Just select latest data
+     * 1845: Mother's age, values are keep increasing since they are alive, Just select latest data
+     * 2946: Father's age, values are keep increasing since they are alive, Just select latest data
      * 40007: Age at death, answer difference distribution is not following normal distribution. And the differences are less than -0.05~0.05 years range, which is likely very small.
    * `> data_UKB/ukb_prune_lon.rds_log.txt` save messages to a designated file
    * Job done: 2021-03-30 02:52:08 for 2.9 min
@@ -126,12 +126,14 @@ Usage examples for ukb_prune:
      ```cmd
      #Rscript ukb-exe.r -pr -v -b db_UKB/ukb38640.csv.rds db_UKB/ukb_fid_info.csv.rds db_UKB/ukb_fid_code.csv.rds -t fig_UKB/prune_con2 data_UKB/ukb_prune_con2.rds --fids 1767 > data_UKB/ukb_prune_con2.rds_log.txt
      Rscript ukb-exe.r -pr -v \
-  	-b db_menopause/ukb44928.csv.rds db_menopause/ukb_fid_info.csv.rds db_menopause/ukb_fid_code.csv.rds \
-     	-t fig_menopause/prune_con2 data_menopause/ukb_prune_con2.rds \
-  	--fids 1767 \
-     > data_menopause/ukb_prune_con2.rds_log.txt
      ```
-   
+
+  	-b db_menopause/ukb44928.csv.rds db_menopause/ukb_fid_info.csv.rds db_menopause/ukb_fid_code.csv.rds \
+  	 	-t fig_menopause/prune_con2 data_menopause/ukb_prune_con2.rds \
+  	--fids 1767 \
+  	 > data_menopause/ukb_prune_con2.rds_log.txt
+  	 ```
+
    * fid21022 Age at recruitment
    
      ```cmd
@@ -260,6 +262,7 @@ Usage examples for ukb_excld:
    	--cat_no \
    	-t data_menopause/eid_fid2814.csv \
    > data_menopause/eid_fid2814.csv_log.txt
+   ```
 ```
    
    * fid2814 Ever used hormone-replacement therapy (HRT)
@@ -277,7 +280,7 @@ Run below codes in R.
 
 eid list 1 - No Surgery/HRT
 
-```R
+​```R
 library(dplyr)
 dir = 'data_menopause'
 eid_hyterectomy = read.csv(paste0(dir,'/eid_fid3591.csv')) %>% unlist
