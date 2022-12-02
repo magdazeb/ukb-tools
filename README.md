@@ -4,24 +4,24 @@ How to use:
 
 * Run help command `Rscript ukb-exe.r -h`
 
-  ```cmd
-  ukb-exe v0.1 (2020-01-12)
+```cmd
+ukb-exe v0.1 (2020-01-12)
+
+Usage: Rscript ukb-exe.r [functions] [options] <-b> <-t>
+
+Functions:
+    --ukb_prune | -pr  This is a first function for automated pruning for UKB data.
+    --ukb_excld | -ex  This is a second function for select eid for further 
+      		       analysis, such as correlation table and linear regression
+                       model.
   
-  Usage: Rscript ukb-exe.r [functions] [options] <-b> <-t>
+Global arguments:
+    --base      | -b   Base RDS files are mendatory.
+    --target    | -t   Target_dir or target_file is mendatory.
+    --verbose   | -v   Rich description for debugging. Default is FALSE.
   
-  Functions:
-      --ukb_prune | -pr  This is a first function for automated pruning for UKB data.
-      --ukb_excld | -ex  This is a second function for select eid for further 
-      				   analysis, such as correlation table and linear regression
-                         model.
-  
-  Global arguments:
-      --base      | -b   Base RDS files are mendatory.
-      --target    | -t   Target_dir or target_file is mendatory.
-      --verbose   | -v   Rich description for debugging. Default is FALSE.
-  
-  Running functions without arguments prints usage information for [functions].
-  ```
+Running functions without arguments prints usage information for [functions].
+```
 
 
 
@@ -67,83 +67,81 @@ Usage examples for ukb_prune:
 
 1. Longevity
 
-   ```cmd
-   #Rscript ukb-exe.r -pr -v -b db_UKB/ukb38640.csv.rds db_UKB/ukb_fid_info.csv.rds db_UKB/ukb_fid_code.csv.rds -t fig_UKB/prune_lon data_UKB/ukb_prune_lon.rds -anns Longevity -expt 1845 2946 40007 > data_UKB/ukb_prune_lon.rds_log.txt
-   Rscript ukb-exe.r -pr -v \
-   	-b db_menopause/ukb44928.csv.rds db_menopause/ukb_fid_info.csv.rds db_menopause/ukb_fid_code.csv.rds \
-   	-t fig_menopause/prune_lon data_menopause/ukb_prune_lon.rds \
-   	-anns Longevity \
-   	-expt 1845 2946 40007 \
-   > data_menopause/ukb_prune_lon.rds_log.txt
-   ```
+```cmd
+#Rscript ukb-exe.r -pr -v -b db_UKB/ukb38640.csv.rds db_UKB/ukb_fid_info.csv.rds db_UKB/ukb_fid_code.csv.rds -t fig_UKB/prune_lon data_UKB/ukb_prune_lon.rds -anns Longevity -expt 1845 2946 40007 > data_UKB/ukb_prune_lon.rds_log.txt
+Rscript ukb-exe.r -pr -v \
+	-b db_menopause/ukb44928.csv.rds db_menopause/ukb_fid_info.csv.rds db_menopause/ukb_fid_code.csv.rds \
+	-t fig_menopause/prune_lon data_menopause/ukb_prune_lon.rds \
+	-anns Longevity \
+	-expt 1845 2946 40007 \
+> data_menopause/ukb_prune_lon.rds_log.txt
+```
 
-   * input RDS files
-     * `db_menopause/ukb44928.csv.rds`: ukb phenotype data (downloaded from UKB and converted to RDS file)
-     * `db_menopause/ukb_fid_info.csv.rds`: ukb field ID information file (manually generated)
-     * `db_menopause/ukb_fid_code.csv.rds`: ukb field ID code information file (manually generated)
-   * `-anns Longevity`: Select a fid preset, 8 phenotypes
-   * `-expt 1845 2946 40007`: exceptionally fids
-     * 1845: Mother's age, values are keep increasing since they are alive, Just select latest data
-     * 2946: Father's age, values are keep increasing since they are alive, Just select latest data
-     * 40007: Age at death, answer difference distribution is not following normal distribution. And the differences are less than -0.05~0.05 years range, which is likely very small.
-   * `> data_UKB/ukb_prune_lon.rds_log.txt` save messages to a designated file
-   * Job done: 2021-03-30 02:52:08 for 2.9 min
+* input RDS files
+  * `db_menopause/ukb44928.csv.rds`: ukb phenotype data (downloaded from UKB and converted to RDS file)
+  * `db_menopause/ukb_fid_info.csv.rds`: ukb field ID information file (manually generated)
+  * `db_menopause/ukb_fid_code.csv.rds`: ukb field ID code information file (manually generated)
+* `-anns Longevity`: Select a fid preset, 8 phenotypes
+* `-expt 1845 2946 40007`: exceptionally fids
+  * 1845: Mother's age, values are keep increasing since they are alive, Just select latest data
+  * 2946: Father's age, values are keep increasing since they are alive, Just select latest data
+  * 40007: Age at death, answer difference distribution is not following normal distribution. And the differences are less than -0.05~0.05 years range, which is likely very small.
+* `> data_UKB/ukb_prune_lon.rds_log.txt` save messages to a designated file
+* Job done: 2021-03-30 02:52:08 for 2.9 min
 
 2. Reproductive aging
 
-   ```cmd
-   #Rscript ukb-exe.r -pr -v -b db_UKB/ukb38640.csv.rds db_UKB/ukb_fid_info.csv.rds db_UKB/ukb_fid_code.csv.rds -t fig_UKB/prune_rep data_UKB/ukb_prune_rep.rds -anns Reproductive_Aging > data_UKB/ukb_prune_rep.rds_log.txt
-   Rscript ukb-exe.r -pr -v \
-   	-b db_menopause/ukb44928.csv.rds db_menopause/ukb_fid_info.csv.rds db_menopause/ukb_fid_code.csv.rds \
-   	-t fig_menopause/prune_rep data_menopause/ukb_prune_rep.rds \
-   	-anns Reproductive_Aging \
-   > data_menopause/ukb_prune_rep.rds_log.txt
-   ```
+```cmd
+#Rscript ukb-exe.r -pr -v -b db_UKB/ukb38640.csv.rds db_UKB/ukb_fid_info.csv.rds db_UKB/ukb_fid_code.csv.rds -t fig_UKB/prune_rep data_UKB/ukb_prune_rep.rds -anns Reproductive_Aging > data_UKB/ukb_prune_rep.rds_log.txt
+Rscript ukb-exe.r -pr -v \
+	-b db_menopause/ukb44928.csv.rds db_menopause/ukb_fid_info.csv.rds db_menopause/ukb_fid_code.csv.rds \
+	-t fig_menopause/prune_rep data_menopause/ukb_prune_rep.rds \
+	-anns Reproductive_Aging \
+> data_menopause/ukb_prune_rep.rds_log.txt
+```
 
-   * `-anns Reproductive_Aging`: Select a fid preset, 14 phenotypes
-   * `> data_UKB/ukb_prune_rep.rds_log.txt`: save messages to a designated file
-   * Job done: 2021-03-30 03:10:02 for 4.3 min
+* `-anns Reproductive_Aging`: Select a fid preset, 14 phenotypes
+* `> data_UKB/ukb_prune_rep.rds_log.txt`: save messages to a designated file
+* Job done: 2021-03-30 03:10:02 for 4.3 min
 
 3. Confounders
 
-   ```cmd
-   #Rscript ukb-exe.r -pr -v -b db_UKB/ukb38640.csv.rds db_UKB/ukb_fid_info.csv.rds db_UKB/ukb_fid_code.csv.rds -t fig_UKB/prune_con data_UKB/ukb_prune_con.rds -anns Confounders > data_UKB/ukb_prune_con.rds_log.txt
-   Rscript ukb-exe.r -pr -v \
-   	-b db_menopause/ukb44928.csv.rds db_menopause/ukb_fid_info.csv.rds db_menopause/ukb_fid_code.csv.rds \
-   	-t fig_menopause/prune_con data_menopause/ukb_prune_con.rds \
-   	-anns Confounders \
-   > data_menopause/ukb_prune_con.rds_log.txt
-   ```
+```cmd
+#Rscript ukb-exe.r -pr -v -b db_UKB/ukb38640.csv.rds db_UKB/ukb_fid_info.csv.rds db_UKB/ukb_fid_code.csv.rds -t fig_UKB/prune_con data_UKB/ukb_prune_con.rds -anns Confounders > data_UKB/ukb_prune_con.rds_log.txt
+Rscript ukb-exe.r -pr -v \
+	-b db_menopause/ukb44928.csv.rds db_menopause/ukb_fid_info.csv.rds db_menopause/ukb_fid_code.csv.rds \
+	-t fig_menopause/prune_con data_menopause/ukb_prune_con.rds \
+	-anns Confounders \
+> data_menopause/ukb_prune_con.rds_log.txt
+```
 
-   * `-anns Confounders`: Select a fid preset, 77 phenotypes
-   * `> data_UKB/ukb_prune_con.rds_log.txt`: save messages to a designated file
-   * Job done: 2021-03-30 03:39:34 for 25.9 min
+* `-anns Confounders`: Select a fid preset, 77 phenotypes
+* `> data_UKB/ukb_prune_con.rds_log.txt`: save messages to a designated file
+* Job done: 2021-03-30 03:39:34 for 25.9 min
 
 4. Additional
 
-   * fid1767 Adopted as a child
+* fid1767 Adopted as a child
 
-     ```cmd
-     #Rscript ukb-exe.r -pr -v -b db_UKB/ukb38640.csv.rds db_UKB/ukb_fid_info.csv.rds db_UKB/ukb_fid_code.csv.rds -t fig_UKB/prune_con2 data_UKB/ukb_prune_con2.rds --fids 1767 > data_UKB/ukb_prune_con2.rds_log.txt
-     Rscript ukb-exe.r -pr -v \
-     ```
+```cmd
+#Rscript ukb-exe.r -pr -v -b db_UKB/ukb38640.csv.rds db_UKB/ukb_fid_info.csv.rds db_UKB/ukb_fid_code.csv.rds -t fig_UKB/prune_con2 data_UKB/ukb_prune_con2.rds --fids 1767 > data_UKB/ukb_prune_con2.rds_log.txt
+Rscript ukb-exe.r -pr -v \
+	-b db_menopause/ukb44928.csv.rds db_menopause/ukb_fid_info.csv.rds db_menopause/ukb_fid_code.csv.rds \
+	-t fig_menopause/prune_con2 data_menopause/ukb_prune_con2.rds \
+	--fids 1767 \
+> data_menopause/ukb_prune_con2.rds_log.txt
+```
 
-  	-b db_menopause/ukb44928.csv.rds db_menopause/ukb_fid_info.csv.rds db_menopause/ukb_fid_code.csv.rds \
-  	 	-t fig_menopause/prune_con2 data_menopause/ukb_prune_con2.rds \
-  	--fids 1767 \
-  	 > data_menopause/ukb_prune_con2.rds_log.txt
-  	 ```
-
-   * fid21022 Age at recruitment
+* fid21022 Age at recruitment
    
-     ```cmd
-     #Rscript ukb-exe.r -pr -v -b db_UKB/ukb25461.csv.rds db_UKB/ukb_fid_info.csv.rds db_UKB/ukb_fid_code.csv.rds -t fig_UKB/prune_con2 data_UKB/ukb_prune_con2_21022.rds --fids 21022 > data_UKB/ukb_prune_con2_21022.rds_log.txt
-     Rscript ukb-exe.r -pr -v \
-     	-b db_menopause/ukb25461.csv.rds db_menopause/ukb_fid_info.csv.rds db_menopause/ukb_fid_code.csv.rds \ #<- ukb25461?
-     	-t fig_menopause/prune_con2 data_menopause/ukb_prune_con2_21022.rds \
-     	--fids 21022 \
-     > data_menopause/ukb_prune_con2_21022.rds_log.txt
-     ```
+```cmd
+#Rscript ukb-exe.r -pr -v -b db_UKB/ukb25461.csv.rds db_UKB/ukb_fid_info.csv.rds db_UKB/ukb_fid_code.csv.rds -t fig_UKB/prune_con2 data_UKB/ukb_prune_con2_21022.rds --fids 21022 > data_UKB/ukb_prune_con2_21022.rds_log.txt
+Rscript ukb-exe.r -pr -v \
+	-b db_menopause/ukb25461.csv.rds db_menopause/ukb_fid_info.csv.rds db_menopause/ukb_fid_code.csv.rds \ #<- ukb25461?
+	-t fig_menopause/prune_con2 data_menopause/ukb_prune_con2_21022.rds \
+	--fids 21022 \
+> data_menopause/ukb_prune_con2_21022.rds_log.txt
+```
 
 
 
@@ -188,89 +186,88 @@ Usage examples for ukb_excld:
 
 1. Filtering Menarche
 
-   ```cmd
-   #Rscript ukb-exe.r --ukb_excld -v -b data_UKB/ukb_prune_rep.rds --fids fid2714 --cutoff 9 20 -t data_UKB/eid_fid2714.csv > data_UKB/eid_fid2714.csv_log.txt
-   Rscript ukb-exe.r --ukb_excld -v \
-   	-b data_menopause/ukb_prune_rep.rds \
-   	--fids fid2714 \
-   	--cutoff 9 20 \
-   	-t data_menopause/eid_fid2714.csv \
-   > data_menopause/eid_fid2714.csv_log.txt
-   ```
+```cmd
+#Rscript ukb-exe.r --ukb_excld -v -b data_UKB/ukb_prune_rep.rds --fids fid2714 --cutoff 9 20 -t data_UKB/eid_fid2714.csv > data_UKB/eid_fid2714.csv_log.txt
+Rscript ukb-exe.r --ukb_excld -v \
+   -b data_menopause/ukb_prune_rep.rds \
+   --fids fid2714 \
+   --cutoff 9 20 \
+   -t data_menopause/eid_fid2714.csv \
+> data_menopause/eid_fid2714.csv_log.txt
+```
 
-   * fid2714 Age when periods started (menarche)
-   * pruned and filtered outliers by <9 or >20 years old
-   * messages saved at `data_UKB/eid_fid2714.csv_log.txt`
+* fid2714 Age when periods started (menarche)
+* pruned and filtered outliers by <9 or >20 years old
+* messages saved at `data_UKB/eid_fid2714.csv_log.txt`
 
 2. Filtering Menopause
 
-   ```cmd
-   #Rscript ukb-exe.r --ukb_excld -v -b data_UKB/ukb_prune_rep.rds --fids fid3581 --cutoff 40 60 -t data_UKB/eid_fid3581.csv > data_UKB/eid_fid3581.csv_log.txt
-   Rscript ukb-exe.r --ukb_excld -v \
-   	-b data_menopause/ukb_prune_rep.rds \
-   	--fids fid3581 \
-   	--cutoff 40 60 \
-   	-t data_menopause/eid_fid3581.csv \
-   > data_menopause/eid_fid3581.csv_log.txt
-   ```
+```cmd
+#Rscript ukb-exe.r --ukb_excld -v -b data_UKB/ukb_prune_rep.rds --fids fid3581 --cutoff 40 60 -t data_UKB/eid_fid3581.csv > data_UKB/eid_fid3581.csv_log.txt
+Rscript ukb-exe.r --ukb_excld -v \
+   -b data_menopause/ukb_prune_rep.rds \
+   --fids fid3581 \
+   --cutoff 40 60 \
+   -t data_menopause/eid_fid3581.csv \
+> data_menopause/eid_fid3581.csv_log.txt
+```
 
-   * fid3581 Age at menopause (last menstrual period)
-   * pruned and filtered outliers by <40 or >60 years old
-   * messages saved at `data_UKB/eid_fid3581.csv_log.txt`
+* fid3581 Age at menopause (last menstrual period)
+* pruned and filtered outliers by <40 or >60 years old
+* messages saved at `data_UKB/eid_fid3581.csv_log.txt`
 
 3. setdiff Hysterectomy
 
-   ```cmd
-   #Rscript ukb-exe.r --ukb_excld -v -b data_UKB/ukb_prune_rep.rds --fids fid3591 fid2824 --cat_no -t data_UKB/eid_fid3591.csv > data_UKB/eid_fid3591.csv_log.txt
-   Rscript ukb-exe.r --ukb_excld -v \
-   	-b data_menopause/ukb_prune_rep.rds \
-   	--fids fid3591 fid2824 \
-   	--cat_no \
-   	-t data_menopause/eid_fid3591.csv \
-   > data_menopause/eid_fid3591.csv_log.txt
-   ```
+```cmd
+#Rscript ukb-exe.r --ukb_excld -v -b data_UKB/ukb_prune_rep.rds --fids fid3591 fid2824 --cat_no -t data_UKB/eid_fid3591.csv > data_UKB/eid_fid3591.csv_log.txt
+Rscript ukb-exe.r --ukb_excld -v \
+   -b data_menopause/ukb_prune_rep.rds \
+   --fids fid3591 fid2824 \
+   --cat_no \
+   -t data_menopause/eid_fid3591.csv \
+> data_menopause/eid_fid3591.csv_log.txt
+```
 
-   * fid3591 Ever had hysterectomy (womb removed): Yes or No
-     * fid2824 Age at hysterectomy: Integer, years
-     * setdiff(fid3591 No, union(fid3591 Yes, fid2824) )
-   * messages saved at `data_UKB/eid_fid3591.csv_log.txt`
+* fid3591 Ever had hysterectomy (womb removed): Yes or No
+  * fid2824 Age at hysterectomy: Integer, years
+  * setdiff(fid3591 No, union(fid3591 Yes, fid2824) )
+* messages saved at `data_UKB/eid_fid3591.csv_log.txt`
 
 4. setdiff Bilateral oophorectomy
 
-   ```cmd
-   #Rscript ukb-exe.r --ukb_excld -v -b data_UKB/ukb_prune_rep.rds --fids fid2834 fid3882 --cat_no -t data_UKB/eid_fid2834.csv > data_UKB/eid_fid2834.csv_log.txt
-   Rscript ukb-exe.r --ukb_excld -v \
-   	-b data_menopause/ukb_prune_rep.rds \
-   	--fids fid2834 fid3882 \
-   	--cat_no \
-   	-t data_menopause/eid_fid2834.csv \
-   > data_menopause/eid_fid2834.csv_log.txt
-   ```
+```cmd
+#Rscript ukb-exe.r --ukb_excld -v -b data_UKB/ukb_prune_rep.rds --fids fid2834 fid3882 --cat_no -t data_UKB/eid_fid2834.csv > data_UKB/eid_fid2834.csv_log.txt
+Rscript ukb-exe.r --ukb_excld -v \
+   -b data_menopause/ukb_prune_rep.rds \
+   --fids fid2834 fid3882 \
+   --cat_no \
+   -t data_menopause/eid_fid2834.csv \
+> data_menopause/eid_fid2834.csv_log.txt
+```
 
-   * fid2834 Bilateral oophorectomy (both ovaries removed): Yes or No
-     * fid3882 Age at bilateral oophorectomy (both ovaries removed): Integer, years
-     * setdiff(fid2834 No, union(fid2834 Yes, fid3882) )
-   * messages saved at `data_UKB/eid_fid2834.csv_log.txt`
+* fid2834 Bilateral oophorectomy (both ovaries removed): Yes or No
+  * fid3882 Age at bilateral oophorectomy (both ovaries removed): Integer, years
+  * setdiff(fid2834 No, union(fid2834 Yes, fid3882) )
+* messages saved at `data_UKB/eid_fid2834.csv_log.txt`
 
 5. setdiff Hormone-replacement therapy (HRT)
 
-   ```cmd
-   #Rscript ukb-exe.r --ukb_excld -v -b data_UKB/ukb_prune_rep.rds --fids fid2814 fid3536 fid3546 --cat_no -t data_UKB/eid_fid2814.csv > data_UKB/eid_fid2814.csv_log.txt
-   Rscript ukb-exe.r --ukb_excld -v \
+```cmd
+#Rscript ukb-exe.r --ukb_excld -v -b data_UKB/ukb_prune_rep.rds --fids fid2814 fid3536 fid3546 --cat_no -t data_UKB/eid_fid2814.csv > data_UKB/eid_fid2814.csv_log.txt
+Rscript ukb-exe.r --ukb_excld -v \
 	-b data_menopause/ukb_prune_rep.rds \
    	--fids fid2814 fid3536 fid3546 \
    	--cat_no \
    	-t data_menopause/eid_fid2814.csv \
-   > data_menopause/eid_fid2814.csv_log.txt
-   ```
+> data_menopause/eid_fid2814.csv_log.txt
 ```
    
-   * fid2814 Ever used hormone-replacement therapy (HRT)
-     * fid3536, Age started hormone-replacement therapy (HRT)
-     * fid3546, Age last used hormone-replacement therapy (HRT)
-   * messages saved at `data_UKB/eid_fid2814.csv_log.txt`
+* fid2814 Ever used hormone-replacement therapy (HRT)
+  * fid3536, Age started hormone-replacement therapy (HRT)
+  * fid3546, Age last used hormone-replacement therapy (HRT)
+* messages saved at `data_UKB/eid_fid2814.csv_log.txt`
    
-   To identify the subjects who don't had hysterectomy, bilateral oophorectomy, and hormone-replacement therapy (HRT), exclude answers of ever had question is Yes as well as data existing in ages at hyterectomy, bilateral oophorectomy, and HRT.
+To identify the subjects who don't had hysterectomy, bilateral oophorectomy, and hormone-replacement therapy (HRT), exclude answers of ever had question is Yes as well as data existing in ages at hyterectomy, bilateral oophorectomy, and HRT.
 
 
 
@@ -280,7 +277,7 @@ Run below codes in R.
 
 eid list 1 - No Surgery/HRT
 
-​```R
+```R
 library(dplyr)
 dir = 'data_menopause'
 eid_hyterectomy = read.csv(paste0(dir,'/eid_fid3591.csv')) %>% unlist
